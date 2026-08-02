@@ -1,0 +1,125 @@
+# The grounded fact table. The most important file in this project.
+#
+# Every factual claim the app makes about a manipulation technique lives
+# here, hand-authored and source-cited. The LLM in Layer 2 SELECTS and
+# PHRASES an entry — it never generates a new factual claim. See CLAUDE.md.
+#
+# Schema per entry (validated by backend/tests/test_taxonomy_integrity.py):
+#   id:             must match a Technique enum value in app/taxonomy.py
+#   plain_name:     short, non-jargon name for the technique
+#   why_it_works:   the psychological mechanism, one sentence
+#   reality_check:  a falsifiable factual claim that undercuts the scam
+#   source:         non-empty citation for the reality_check
+#   counter_action: one concrete, disengage-and-verify next step
+
+- id: manufactured_urgency
+  plain_name: "A fake deadline"
+  why_it_works: "A tight deadline is designed to stop you from pausing to think or call someone else before you act."
+  reality_check: >
+    No genuine government agency, court, or bank ever requires you to act
+    within a few hours. Real legal and financial processes always allow time
+    for you to verify, consult a lawyer, or call the institution directly.
+  source: "I4C (Indian Cyber Crime Coordination Centre) public advisory on digital arrest scams"
+  counter_action: "Take the time anyway. A real deadline can survive you calling to verify it first."
+
+- id: false_authority
+  plain_name: "Pretending to be the police"
+  why_it_works: "A uniform, a badge, or an official-sounding name shuts down questioning before it starts."
+  reality_check: >
+    There is no such thing as "digital arrest" in Indian law. No law
+    permits arrest, detention, or interrogation by phone or video call.
+    Real police, CBI, ED, or customs officers do not conduct investigations
+    over WhatsApp or Skype video calls.
+  source: "I4C advisory on digital arrest scams; Government of India press releases on the Supreme Court-ordered CBI probe into digital arrest fraud"
+  counter_action: "Hang up. Call your local police station directly using a number you look up yourself — never one they give you."
+
+- id: isolation
+  plain_name: "Telling you to keep it secret"
+  why_it_works: "The scam depends on you not talking to anyone who could break the spell — a family member, a friend, or the bank."
+  reality_check: >
+    No real investigation, court case, or bank process ever requires total
+    secrecy from your own family. "Sub-judice" does not mean you are
+    forbidden from telling your spouse or child that someone called you.
+  source: "1930 National Cyber Crime Helpline public guidance"
+  counter_action: "Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam."
+
+- id: fear_of_consequence
+  plain_name: "Threatening arrest or jail"
+  why_it_works: "Fear of jail or a criminal record overrides careful thinking, especially when a specific legal section is named to sound credible."
+  reality_check: >
+    Citing a section number (like IPC 420 or the NDPS Act) does not make a
+    call legitimate — anyone can read a law online. Being named in an
+    investigation, if it were real, would involve a written notice and a
+    physical summons, not a same-day phone threat.
+  source: "I4C advisory on digital arrest scams"
+  counter_action: "Do not respond to the threat. Verify independently with the agency named, using a number you find yourself, not one given to you on the call."
+
+- id: verification_theater
+  plain_name: "Fake documents shown on screen"
+  why_it_works: "Seeing an ID card, an FIR, or a court order on screen feels like proof, even though anyone can create a convincing-looking document."
+  reality_check: >
+    The Reserve Bank of India does not operate an "escrow account" for
+    citizens to transfer money into for verification. No legitimate
+    verification process anywhere involves you sending money to prove your
+    money is clean.
+  source: "RBI public awareness communications on frauds; I4C advisory on digital arrest scams"
+  counter_action: "Do not transfer anything to 'verify' funds. No real process ever asks you to pay to prove you're innocent."
+
+- id: channel_switch
+  plain_name: "Moving you to a different app or number"
+  why_it_works: "Switching to an unmonitored channel, or installing remote-access software, removes the safety checks your bank or phone might otherwise provide."
+  reality_check: >
+    Legitimate banks and government agencies do not ask you to install
+    remote-desktop apps like AnyDesk or TeamViewer, and do not conduct
+    official business over WhatsApp or Telegram calls.
+  source: "1930 National Cyber Crime Helpline public guidance"
+  counter_action: "Never install an app someone asks you to install during an unsolicited call. Hang up and contact the institution directly."
+
+- id: payment_irreversibility
+  plain_name: "A payment trick disguised as receiving money"
+  why_it_works: "The request is worded or framed to look like you're about to receive money, when scanning the code or approving the request actually sends money out."
+  reality_check: >
+    On UPI, you only ever need to scan a QR code or enter your PIN to SEND
+    money — never to receive it. If approving something requires your UPI
+    PIN, money is leaving your account, not arriving.
+  source: "RBI and NPCI public awareness guidance on UPI fraud"
+  counter_action: "Never enter your UPI PIN to 'receive' a payment. If a PIN is required, stop — you are about to pay, not get paid."
+
+- id: trust_transfer
+  plain_name: "Pretending to be someone you know"
+  why_it_works: "Borrowing the identity of a family member, friend, or trusted brand transfers the trust you already have onto the scammer."
+  reality_check: >
+    A changed number, a new WhatsApp account, or a claim of "I lost my
+    phone" is not proof of identity. Anyone can create a profile using a
+    stolen photo and name.
+  source: "1930 National Cyber Crime Helpline public guidance"
+  counter_action: "Call the person back on the number you already have saved for them, not the new number they texted you from."
+
+- id: reciprocity_hook
+  plain_name: "An unexpected gift or refund"
+  why_it_works: "Being offered something for free creates a felt obligation to respond quickly, which short-circuits normal caution."
+  reality_check: >
+    Legitimate refunds, prizes, or cashback are never released only after
+    you first pay a "processing fee" or share your card/PIN details.
+  source: "I4C advisory on lottery and prize-based frauds"
+  counter_action: "Ignore it. A real refund from a bank or company never requires you to pay first to receive it."
+
+- id: fake_scarcity
+  plain_name: "Only a few spots left"
+  why_it_works: "Artificial scarcity pushes you to decide fast, before you'd normally stop to check if the offer is real."
+  reality_check: >
+    Genuine limited-time offers from real banks or businesses are also
+    described on their official website or app — if you can't find it
+    there, the urgency is manufactured.
+  source: "I4C consumer fraud advisory"
+  counter_action: "Check the offer independently on the official website or app before acting. If it's real, it'll still be there in ten minutes."
+
+- id: sunk_cost_pressure
+  plain_name: "'You've already paid, just one more step'"
+  why_it_works: "Having already paid something makes stopping feel like a loss, so people keep paying to avoid 'wasting' the first payment."
+  reality_check: >
+    A prior payment does not obligate or entitle a scammer to more money.
+    Every additional payment request is a new decision, independent of what
+    was already sent.
+  source: "1930 National Cyber Crime Helpline public guidance"
+  counter_action: "Stop now. Money already sent is gone either way — sending more does not get it back."

@@ -1,0 +1,26 @@
+# API
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+
+# LLM runtime client (talks to local Ollama server)
+ollama>=0.4
+
+# Data / eval
+pyyaml>=6.0
+scikit-learn>=1.5
+pandas>=2.2
+matplotlib>=3.9
+
+# Distillation
+# NOTE: torch is intentionally NOT listed here. A plain `pip install -r
+# requirements.txt` would pull a CPU-only wheel from PyPI, which is useless
+# on the 4060 and gets discarded anyway — install the CUDA build first, see
+# README "Setup":
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+transformers>=4.51
+datasets>=3.0
+accelerate>=1.0
+
+# Testing
+pytest>=8.3

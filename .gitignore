@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Data — large/re-downloadable public datasets and mechanically-rebuilt
+# output are excluded; hand-authored and hand-labeled files are NOT (they're
+# original work product, not re-downloadable, and small).
+backend/data/corpus/raw/*
+!backend/data/corpus/raw/handcrafted_india.jsonl
+backend/data/corpus/processed/
+!backend/data/corpus/gold/
+
+# Models
+backend/models/*.bin
+backend/models/*.safetensors
+backend/models/checkpoint-*/
+*.gguf
+
+# Study data — participant responses, even scrubbed
+study/data/
+study/*.csv
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env / secrets (should never be needed, but block by default)
+.env
+.env.*
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
