@@ -72,11 +72,30 @@ class ExplainResult:
     table-only text with no model call succeeding at all."""
 
 
+QUOTE_CHARS = set("\"'“”‘’")
+
+
+def _span_is_quoted(sentence: str, span: str) -> bool:
+    """True if `span` appears in `sentence` immediately wrapped in quote
+    characters on both sides. A model that copies the span verbatim but
+    drops the quotes produces a grammatically broken run-on sentence when
+    concatenated with the reality-check text — this is separate from (and
+    in addition to) the verbatim-substring check below."""
+    idx = sentence.find(span)
+    if idx == -1:
+        return False
+    before = sentence[idx - 1] if idx > 0 else ""
+    after = sentence[idx + len(span)] if idx + len(span) < len(sentence) else ""
+    return before in QUOTE_CHARS and after in QUOTE_CHARS
+
+
 def validate_purpose_sentence(sentence: str, span: str) -> list[str]:
     """Return validation problems; an empty list means it passed."""
     problems = []
     if span not in sentence:
         problems.append("missing verbatim span")
+    elif not _span_is_quoted(sentence, span):
+        problems.append("verbatim span present but not wrapped in quotation marks")
     word_count = len(sentence.split())
     if word_count > MAX_PURPOSE_WORDS:
         problems.append(f"too long ({word_count} words, max {MAX_PURPOSE_WORDS})")

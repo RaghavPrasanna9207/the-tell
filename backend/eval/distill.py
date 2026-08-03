@@ -42,11 +42,47 @@ from eval.metrics import format_report, per_technique_metrics
 
 MODEL_NAME = "answerdotai/ModernBERT-base"
 SILVER_LABELS_PATH = Path(__file__).parent.parent / "data" / "corpus" / "processed" / "silver_labels.jsonl"
+HANDCRAFTED_TRAIN_PATH = Path(__file__).parent.parent / "data" / "corpus" / "raw" / "handcrafted_india_train.jsonl"
 STUDENT_MODEL_DIR = Path(__file__).parent.parent / "models" / "student"
 
 
+def load_handcrafted_train() -> list[dict]:
+    """Author-labeled messages written specifically to backstop distillation
+    training (not silver-labeled, not used for eval). Separate from
+    `handcrafted_india.jsonl` — that file is the gold-holdout set and must
+    never be trained on; this one exists because the silver-labeled pool
+    turned out to have near-zero positive coverage for most techniques (see
+    the first real distillation run: only reciprocity_hook/fake_scarcity/
+    manufactured_urgency had meaningful support, because the UCI SMS corpus
+    barely contains India-specific manipulation language)."""
+    if not HANDCRAFTED_TRAIN_PATH.exists():
+        return []
+    valid = {t.value for t in Technique}
+    records = []
+    with HANDCRAFTED_TRAIN_PATH.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            entry = json.loads(line)
+            for label in entry["draft_labels"]:
+                if label not in valid:
+                    raise ValueError(f"{entry['id']} has invalid label {label!r}")
+            records.append({"text": entry["text"], "labels": entry["draft_labels"]})
+    return records
+
+
 def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
-    """Returns (texts, y_true, technique_names, is_smoke_test)."""
+    """Returns (texts, y_true, technique_names, is_smoke_test).
+
+    IMPORTANT: silver records with source "handcrafted_india" are excluded
+    from the trainable pool here. Those are the exact same messages
+    `eval.gold.load_draft_gold()` returns as the gold-holdout eval set — if
+    the student trained on them, `evaluate_on_true_gold` below would be
+    measuring memorization, not generalization. They're held out entirely,
+    never randomly split in, so the gold numbers this script reports are a
+    real holdout.
+    """
     if SILVER_LABELS_PATH.exists():
         records = []
         with SILVER_LABELS_PATH.open(encoding="utf-8") as f:
@@ -54,12 +90,29 @@ def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
                 line = line.strip()
                 if line:
                     records.append(json.loads(line))
+
+        n_before = len(records)
+        records = [r for r in records if r.get("source") != "handcrafted_india"]
+        n_held_out = n_before - len(records)
+        print(
+            f"Held out {n_held_out} handcrafted_india silver records from training "
+            f"(reserved for the true gold-holdout eval) — {len(records)} remain trainable."
+        )
+
         texts = [r["text"] for r in records]
+        labels = [r["labels"] for r in records]
+
+        extra = load_handcrafted_train()
+        if extra:
+            print(f"Adding {len(extra)} hand-labeled records from {HANDCRAFTED_TRAIN_PATH.name} to training.")
+            texts += [r["text"] for r in extra]
+            labels += [r["labels"] for r in extra]
+
         technique_names = [t.value for t in Technique]
         from sklearn.preprocessing import MultiLabelBinarizer
 
         mlb = MultiLabelBinarizer(classes=technique_names)
-        y_true = mlb.fit_transform([r["labels"] for r in records])
+        y_true = mlb.fit_transform(labels)
         return texts, y_true, technique_names, False
 
     print(f"WARNING: {SILVER_LABELS_PATH} not found — falling back to draft gold.")
@@ -67,6 +120,29 @@ def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
     records = load_draft_gold()
     texts, y_true, technique_names = load_gold_as_arrays(records)
     return texts, y_true, technique_names, True
+
+
+def evaluate_on_true_gold(trainer: "Trainer", tokenizer, technique_names: list[str]) -> list:
+    """The real held-out eval: the ~60 handcrafted_india messages, which
+    were excluded from training entirely (see load_training_data). This is
+    the number that belongs in the three-way baseline/teacher/student table
+    — the Trainer's own eval_dataset (a random split of the trainable pool)
+    is only a training-loop sanity check, not this.
+    """
+    from sklearn.preprocessing import MultiLabelBinarizer
+
+    records = load_draft_gold()
+    texts = [r["text"] for r in records]
+    mlb = MultiLabelBinarizer(classes=technique_names)
+    y_true = mlb.fit_transform([r["labels"] for r in records])
+
+    dataset = Dataset.from_dict({"text": texts, "labels": y_true.astype(np.float32).tolist()})
+    dataset = dataset.map(
+        lambda batch: tokenizer(batch["text"], truncation=True, padding="max_length", max_length=256), batched=True
+    )
+    predictions = trainer.predict(dataset)
+    proba = 1 / (1 + np.exp(-predictions.predictions))
+    return per_technique_metrics(y_true, proba, technique_names)
 
 
 def compute_metrics(eval_pred: EvalPrediction, technique_names: list[str]) -> dict:
@@ -126,8 +202,17 @@ def main() -> None:
     y_true_test = np.array(tokenized["test"]["labels"])
     results = per_technique_metrics(y_true_test, proba, technique_names)
 
-    title = "STUDENT (ModernBERT-base) — SMOKE TEST" if is_smoke_test else "STUDENT (ModernBERT-base)"
+    title = (
+        "STUDENT (ModernBERT-base) — SMOKE TEST"
+        if is_smoke_test
+        else "STUDENT (ModernBERT-base) — internal validation split (training-loop sanity check only)"
+    )
     print(format_report(results, title))
+
+    if not is_smoke_test:
+        print(f"\n{'=' * 70}\nWARNING: {DRAFT_GOLD_WARNING}\n{'=' * 70}")
+        gold_results = evaluate_on_true_gold(trainer, tokenizer, technique_names)
+        print(format_report(gold_results, "STUDENT (ModernBERT-base) — TRUE GOLD HOLDOUT (never seen in training)"))
 
     STUDENT_MODEL_DIR.mkdir(parents=True, exist_ok=True)
     trainer.save_model(str(STUDENT_MODEL_DIR))

@@ -24,6 +24,16 @@ def test_missing_span_fails():
     assert any("verbatim span" in p for p in problems)
 
 
+def test_span_present_but_unquoted_fails():
+    """A real failure seen in practice: the model copies the span verbatim
+    but drops the quotation marks, producing a run-on sentence when
+    concatenated with the reality-check text."""
+    span = "Only 3 winners have been selected today"
+    sentence = f"{span} which creates false scarcity to rush your decision."
+    problems = validate_purpose_sentence(sentence, span)
+    assert any("not wrapped in quotation marks" in p for p in problems)
+
+
 def test_too_long_fails():
     span = "act now"
     sentence = f'"{span}" ' + "word " * (MAX_PURPOSE_WORDS + 5)

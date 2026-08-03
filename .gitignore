@@ -11,13 +11,13 @@ venv/
 # original work product, not re-downloadable, and small).
 backend/data/corpus/raw/*
 !backend/data/corpus/raw/handcrafted_india.jsonl
+!backend/data/corpus/raw/handcrafted_india_train.jsonl
 backend/data/corpus/processed/
 !backend/data/corpus/gold/
 
-# Models
-backend/models/*.bin
-backend/models/*.safetensors
-backend/models/checkpoint-*/
+# Models — trained checkpoints are large binary artifacts (the distilled
+# student alone is ~600MB), never commit them regardless of nesting depth.
+backend/models/
 *.gguf
 
 # Study data — participant responses, even scrubbed

@@ -96,8 +96,65 @@ scam flag. See `study/PREREGISTRATION.md` for the study's hypothesis and analysi
 plan, committed before any participant runs. Results and full methodology writeup
 land once week 2–3 land.
 
-**Honesty note:** the eval numbers you'll see today from `run_eval.py` run against
-a ~60-message draft-labeled set (self-labeled at authoring time, no second
-annotator, no kappa) — not the ~250-message hand-labeled gold set with
-inter-annotator agreement the plan calls for. Treat current numbers as a pilot,
-not a result; the harness itself is real and reusable once real gold labels land.
+```bash
+# Silver-label ~1000 corpus messages with the local teacher (for distillation)
+python backend/eval/silver_label.py
+
+# Real distillation once silver labels exist (falls back to a smoke test otherwise)
+python backend/eval/distill.py
+
+# Three-way baseline/teacher/student comparison against the gold set
+python backend/eval/compare.py
+
+# One-time: freeze Layer 1/2 output for the study's 6 fixed stimuli
+python study/build_stimuli_cache.py
+
+# One run per participant (randomly, balanced, assigned to control/treatment)
+python study/run_study.py
+
+# Fixed analysis plan against collected responses
+python study/analyze_study.py
+```
+
+**Honesty note:** every number below runs against a ~60-message draft-labeled set
+(self-labeled at authoring time, no second annotator, no kappa) — not the
+~250-message hand-labeled gold set with inter-annotator agreement the plan calls
+for. Treat current numbers as a pilot, not a result; the harness itself is real
+and reusable once real gold labels land.
+
+### Results (three-way comparison, N=60 draft gold)
+
+| System | Macro-F1 | Precision | Recall | Latency/msg | Size |
+|---|---|---|---|---|---|
+| Baseline (TF-IDF + LR) | 0.52 | 0.42 | 0.77 | ~0ms (CPU) | negligible |
+| Teacher (Qwen2.5-7B, live) | **0.64** | 0.83 | 0.53 | 2358ms | ~4.5GB |
+| Student (distilled ModernBERT) | 0.47 | 0.36 | 0.77 | **67ms** | **574MB** |
+
+Run via `eval/compare.py`, same 60 messages for all three.
+
+**The distillation quality gap, and what actually fixed it.** The first real
+distillation run scored macro-F1 = **0.10**, with zero recall on 8 of 11
+techniques. Root cause: the ~940-message silver-labeled training pool had almost
+no positive examples for most techniques, because the corpus behind it is mostly
+generic UCI SMS spam — it just doesn't contain India-specific digital-arrest/UPI
+manipulation language. The one corpus subset that does (the 60 handcrafted
+messages) had to be excluded from training entirely to keep the gold-eval
+holdout honest, so the student trained on almost no in-domain positive examples
+for 8 of the 11 techniques.
+
+The fix was to write more training data, not tune the training loop: 78 new
+hand-labeled messages targeting exactly the underrepresented techniques
+(`backend/data/corpus/raw/handcrafted_india_train.jsonl` — training-only, never
+touches the gold-eval set). Re-running distillation on the augmented pool took
+the true gold-holdout macro-F1 from 0.10 to **0.47**, and every technique moved
+off zero recall. `trust_transfer` is the one technique that stays weak across
+*every* system (F1 = 0.0 for both baseline and teacher, support = 4) — that's a
+genuine low-support problem, not something specific to distillation.
+
+Two real bugs surfaced along the way, both fixed: the Layer 2 validator checked
+that a technique's span appeared verbatim but not that it was actually *quoted*,
+so one live explanation came out as a run-on, ungrammatical sentence (now
+checked). And the teacher occasionally emits a confidence value outside [0, 1]
+(seen ~0.2–5% of calls depending on the sample) — schema-constrained decoding
+enforces JSON *shape*, not numeric *bounds*, which is exactly why the Pydantic
+validation step in `app/llm.py` isn't optional scaffolding.
