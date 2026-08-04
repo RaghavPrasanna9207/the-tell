@@ -32,28 +32,11 @@ EXISTING_PATH = LABELS_DIR / "labels_primary.jsonl"
 
 TECHNIQUES = list(Technique)
 
-# Specific rows flagged during manual review of the first-pass answers in
-# labels_primary.jsonl (see conversation history) — suggestions only.
-REVIEW_NOTES: dict[str, str] = {
-    "IN-045": "Consider dropping sunk_cost_pressure (nothing paid yet) and reciprocity_hook (not a gift).",
-    "IN-010": "Consider dropping payment_irreversibility — no payment mechanism in the text.",
-    "IN-004": "Consider adding isolation — 'stay on this call 24x7' matches that definition directly.",
-    "IN-022": "Judgment call: false_authority not clearly named; sunk_cost_pressure is weak (nothing paid yet) — maybe reciprocity_hook instead.",
-    "uci-03397": "Consider dropping payment_irreversibility and sunk_cost_pressure (nothing paid); fake_scarcity duplicates the urgency phrase.",
-    "IN-030": "Consider adding payment_irreversibility + manufactured_urgency (UPI collect request 'today'); verification_theater is weak here.",
-    "uci-03010": "Consider dropping verification_theater — no fake proof shown, just a rate-plan ad.",
-    "uci-04841": "Consider dropping verification_theater — an 'identifier code' isn't fake proof.",
-    "IN-028": "Consider adding isolation — 'stay connected until officer confirms closure' is the same pattern as IN-004.",
-    "uci-04754": "Consider dropping payment_irreversibility — no payment mechanism visible (message is genuinely truncated in the source data).",
-    "IN-011": "Consider dropping payment_irreversibility + reciprocity_hook — this message is the install-AnyDesk step, no payment/gift framing yet.",
-    "uci-00042": "Consider dropping verification_theater — no fake proof.",
-    "IN-043": "Consider swapping fake_scarcity -> manufactured_urgency ('today' is a deadline, not a slot count).",
-    "uci-02119": "Consider dropping verification_theater + payment_irreversibility — premium-SMS prize spam, no fake proof or payment framing.",
-    "IN-005": "Judgment call: payment_irreversibility is a stretch (direct transfer, not a receipt-framed trick); manufactured_urgency refers to refund timing, not an action deadline.",
-    "uci-02987": "Consider dropping verification_theater + payment_irreversibility.",
-    "IN-006": "Consider adding verification_theater — 'FIR copy and ID card' is the definition's own example.",
-    "IN-031": "Consider dropping verification_theater + channel_switch — sharing to groups isn't channel_switch; no fake proof.",
-}
+# Specific rows flagged during manual review of a first-pass answer.
+# The batch reviewed 2026-08-04 was resolved (13 auto-applied, 5 re-answered
+# by hand in gold_labelling_remaining.xlsx) — this is empty until the next
+# review pass flags something new.
+REVIEW_NOTES: dict[str, str] = {}
 
 HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
 HEADER_FONT = Font(bold=True)
