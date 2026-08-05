@@ -37,7 +37,7 @@ from transformers import (
 
 from app.taxonomy import Technique
 from eval.baseline import load_gold_as_arrays
-from eval.gold import DRAFT_GOLD_WARNING, load_draft_gold
+from eval.gold import DRAFT_GOLD_WARNING, GOLD_NOTE, load_draft_gold, load_real_gold
 from eval.metrics import format_report, per_technique_metrics
 
 MODEL_NAME = "answerdotai/ModernBERT-base"
@@ -75,13 +75,17 @@ def load_handcrafted_train() -> list[dict]:
 def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
     """Returns (texts, y_true, technique_names, is_smoke_test).
 
-    IMPORTANT: silver records with source "handcrafted_india" are excluded
-    from the trainable pool here. Those are the exact same messages
-    `eval.gold.load_draft_gold()` returns as the gold-holdout eval set — if
-    the student trained on them, `evaluate_on_true_gold` below would be
-    measuring memorization, not generalization. They're held out entirely,
-    never randomly split in, so the gold numbers this script reports are a
-    real holdout.
+    IMPORTANT: every silver record whose id appears in the real gold set
+    (`eval.gold.load_real_gold()`, `data/corpus/gold/labels_primary.jsonl`)
+    is excluded from the trainable pool here — all 250 of them, not just
+    the handcrafted_india subset. The gold set's ~190 uci_sms_spam messages
+    come from the same seeded shuffle silver labeling used (gold is a
+    prefix subset of silver's shuffle order at the same seed), so excluding
+    only handcrafted_india previously left those 190 gold messages inside
+    the training data — the student was measuring memorization, not
+    generalization, on 76% of the gold-holdout eval. They're held out
+    entirely now, never randomly split in, so the gold numbers this script
+    reports are a real holdout.
     """
     if SILVER_LABELS_PATH.exists():
         records = []
@@ -91,12 +95,13 @@ def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
                 if line:
                     records.append(json.loads(line))
 
+        gold_ids = {r["id"] for r in load_real_gold()}
         n_before = len(records)
-        records = [r for r in records if r.get("source") != "handcrafted_india"]
+        records = [r for r in records if r.get("id") not in gold_ids]
         n_held_out = n_before - len(records)
         print(
-            f"Held out {n_held_out} handcrafted_india silver records from training "
-            f"(reserved for the true gold-holdout eval) — {len(records)} remain trainable."
+            f"Held out {n_held_out} silver records whose id is in the real gold set from "
+            f"training (reserved for the true gold-holdout eval) — {len(records)} remain trainable."
         )
 
         texts = [r["text"] for r in records]
@@ -123,15 +128,16 @@ def load_training_data() -> tuple[list[str], np.ndarray, list[str], bool]:
 
 
 def evaluate_on_true_gold(trainer: "Trainer", tokenizer, technique_names: list[str]) -> list:
-    """The real held-out eval: the ~60 handcrafted_india messages, which
-    were excluded from training entirely (see load_training_data). This is
-    the number that belongs in the three-way baseline/teacher/student table
-    — the Trainer's own eval_dataset (a random split of the trainable pool)
-    is only a training-loop sanity check, not this.
+    """The real held-out eval: all 250 messages in the real gold set
+    (`labels_primary.jsonl`), which are excluded from training entirely
+    (see load_training_data). This is the number that belongs in the
+    three-way baseline/teacher/student table — the Trainer's own
+    eval_dataset (a random split of the trainable pool) is only a
+    training-loop sanity check, not this.
     """
     from sklearn.preprocessing import MultiLabelBinarizer
 
-    records = load_draft_gold()
+    records = load_real_gold()
     texts = [r["text"] for r in records]
     mlb = MultiLabelBinarizer(classes=technique_names)
     y_true = mlb.fit_transform([r["labels"] for r in records])
@@ -210,7 +216,7 @@ def main() -> None:
     print(format_report(results, title))
 
     if not is_smoke_test:
-        print(f"\n{'=' * 70}\nWARNING: {DRAFT_GOLD_WARNING}\n{'=' * 70}")
+        print(f"\n{'=' * 70}\n{GOLD_NOTE}\n{'=' * 70}")
         gold_results = evaluate_on_true_gold(trainer, tokenizer, technique_names)
         print(format_report(gold_results, "STUDENT (ModernBERT-base) — TRUE GOLD HOLDOUT (never seen in training)"))
 

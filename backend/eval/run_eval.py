@@ -1,9 +1,8 @@
-"""Eval harness entry point.
-
-Currently runs the TF-IDF + LogisticRegression baseline via cross-validation
-against the draft-labeled corpus. The Ollama teacher and distilled student
-columns get added once corpus labeling (Batch-equivalent local labeling)
-and distillation land — see the plan's Week 2.
+"""Eval harness entry point: the TF-IDF + LogisticRegression baseline only,
+via cross-validation against the real gold set. For the full baseline /
+teacher / student three-way comparison (per-technique + macro + latency +
+model size), see `eval/compare.py` — this script is the quick baseline-only
+check.
 
 Run: python eval/run_eval.py
 """
@@ -17,17 +16,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from eval.baseline import load_gold_as_arrays, run_baseline_cv
-from eval.gold import DRAFT_GOLD_WARNING, load_draft_gold
+from eval.gold import GOLD_NOTE, load_real_gold
 from eval.metrics import format_report, per_technique_metrics
 
 
 def main() -> None:
-    records = load_draft_gold()
+    records = load_real_gold()
     n_positive = sum(1 for r in records if r["labels"])
     n_clean = sum(1 for r in records if not r["labels"])
 
     print("=" * 70)
-    print(f"WARNING: {DRAFT_GOLD_WARNING}")
+    print(GOLD_NOTE)
     print(f"   N = {len(records)} ({n_positive} scam, {n_clean} clean)")
     print("=" * 70)
 

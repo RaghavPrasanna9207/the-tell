@@ -1,5 +1,5 @@
 """Three-way comparison: TF-IDF baseline vs. Ollama teacher vs. distilled
-student, all evaluated on the same held-out set — `eval.gold.load_draft_gold()`
+student, all evaluated on the same held-out set — `eval.gold.load_real_gold()`
 — so the numbers are directly comparable. Per-technique + macro metrics,
 latency, and model size (see plan Week 2, step 4).
 
@@ -21,7 +21,7 @@ import numpy as np
 from app.classify import classify
 from app.llm import TEACHER_MODEL, check_available
 from eval.baseline import load_gold_as_arrays, run_baseline_cv
-from eval.gold import DRAFT_GOLD_WARNING, load_draft_gold
+from eval.gold import GOLD_NOTE, load_real_gold
 from eval.metrics import format_report, macro_average, per_technique_metrics
 
 STUDENT_MODEL_DIR = Path(__file__).parent.parent / "models" / "student"
@@ -89,9 +89,9 @@ def dir_size_mb(path: Path) -> float:
 
 
 def main() -> None:
-    records = load_draft_gold()
+    records = load_real_gold()
     print("=" * 70)
-    print(f"WARNING: {DRAFT_GOLD_WARNING}")
+    print(GOLD_NOTE)
     print(f"N = {len(records)}")
     print("=" * 70)
 

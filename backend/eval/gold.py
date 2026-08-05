@@ -16,12 +16,20 @@ from pathlib import Path
 from app.taxonomy import Technique
 
 CORPUS_PATH = Path(__file__).parent.parent / "data" / "corpus" / "raw" / "handcrafted_india.jsonl"
+LABELS_PATH = Path(__file__).parent.parent / "data" / "corpus" / "gold" / "labels_primary.jsonl"
 
 DRAFT_GOLD_WARNING = (
     "DRAFT LABELS, NOT VERIFIED GOLD - author-assigned at message-authoring "
     "time, no second annotator, no kappa computed. N is far below the "
     "planned ~250-message hand-labeled set. Treat these numbers as a rough "
     "pilot, not a result."
+)
+
+GOLD_NOTE = (
+    "REAL GOLD SET - N=250, every message individually reviewed (see "
+    "data/corpus/gold/labels_primary.jsonl). Still single-annotator: "
+    "inter-annotator agreement (Cohen's kappa) has not been computed yet "
+    "- see eval/label.py --annotator second --kappa-subset."
 )
 
 
@@ -44,5 +52,26 @@ def load_draft_gold() -> list[dict]:
             for label in labels:
                 if label not in valid:
                     raise ValueError(f"{entry['id']} has invalid draft_label {label!r}")
+            records.append({"id": entry["id"], "text": entry["text"], "labels": labels})
+    return records
+
+
+def load_real_gold() -> list[dict]:
+    """Load the real hand-labeled gold set: all 250 sampled messages from
+    `data/corpus/gold/labels_primary.jsonl`, every one individually
+    reviewed. Same shape and validation guarantee as `load_draft_gold`.
+    """
+    valid = {t.value for t in Technique}
+    records = []
+    with LABELS_PATH.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            entry = json.loads(line)
+            labels = entry.get("labels") or []
+            for label in labels:
+                if label not in valid:
+                    raise ValueError(f"{entry['id']} has invalid label {label!r}")
             records.append({"id": entry["id"], "text": entry["text"], "labels": labels})
     return records
