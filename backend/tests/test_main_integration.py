@@ -47,10 +47,10 @@ def test_analyze_clean_message_end_to_end():
 
 def test_analyze_scam_message_end_to_end():
     """Mocks both LLM call sites (classify's detection + explain's purpose
-    sentence) to verify the full pipeline assembles a correct response:
-    the card's explanation must contain the verbatim span (from Layer 1)
-    and the exact, unmodified reality-check/source from the counter-move
-    table (never touched by the mocked "LLM" purpose sentence)."""
+    clause) to verify the full pipeline assembles a correct response: the
+    card's explanation must contain the verbatim span (inserted
+    programmatically, not by the mocked "LLM" purpose clause) and the
+    exact, unmodified reality-check/source from the counter-move table."""
     message = "Do not tell your family. This is CBI calling."
     span = "Do not tell your family"
 
@@ -58,14 +58,13 @@ def test_analyze_scam_message_end_to_end():
         detections=[Detection(technique=Technique.ISOLATION, span=span, confidence=0.92)]
     )
 
-    class FakePurposeSentence:
-        sentence = f'"{span}" exists to stop anyone from stepping in before you act.'
+    fake_purpose = "This exists to stop anyone from stepping in before you act."
 
     with (
         patch("app.classify.generate_structured", return_value=(fake_analysis, _fake_generation())),
         patch(
-            "app.explain._generate_purpose_sentence",
-            return_value=(FakePurposeSentence.sentence, _fake_generation()),
+            "app.explain._generate_purpose_clause",
+            return_value=(fake_purpose, _fake_generation()),
         ),
     ):
         r = client.post("/analyze", json={"text": message})

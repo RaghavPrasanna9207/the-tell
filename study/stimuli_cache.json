@@ -10,7 +10,7 @@
         "plain_name": "Pretending to be the police",
         "span": "This is Sub-Inspector Vikram Rathore, Mumbai Cyber Crime Cell.",
         "confidence": 1.0,
-        "explanation": "\"This is Sub-Inspector Vikram Rathore, Mumbai Cyber Crime Cell.\" is a sign of pretending to be the police. There is no such thing as \"digital arrest\" in Indian law. No law permits arrest, detention, or interrogation by phone or video call. Real police, CBI, ED, or customs officers do not conduct investigations over WhatsApp or Skype video calls. Hang up. Call your local police station directly using a number you look up yourself — never one they give you.",
+        "explanation": "\"This is Sub-Inspector Vikram Rathore, Mumbai Cyber Crime Cell.\" — To intimidate you and prevent you from doubting their identity. There is no such thing as \"digital arrest\" in Indian law. No law permits arrest, detention, or interrogation by phone or video call. Real police, CBI, ED, or customs officers do not conduct investigations over WhatsApp or Skype video calls. Hang up. Call your local police station directly using a number you look up yourself — never one they give you.",
         "source": "I4C advisory on digital arrest scams; Government of India press releases on the Supreme Court-ordered CBI probe into digital arrest fraud"
       },
       {
@@ -18,7 +18,7 @@
         "plain_name": "Telling you to keep it secret",
         "span": "You must stay on this video call and not disconnect until verification is complete. Do not inform any family member — this matter is sub-judice.",
         "confidence": 1.0,
-        "explanation": "\"You must stay on this video call and not disconnect until verification is complete. Do not inform any family member — this matter is sub-judice.\" is a sign of telling you to keep it secret. No real investigation, court case, or bank process ever requires total secrecy from your own family. \"Sub-judice\" does not mean you are forbidden from telling your spouse or child that someone called you. Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam.",
+        "explanation": "\"You must stay on this video call and not disconnect until verification is complete. Do not inform any family member — this matter is sub-judice.\" — To isolate you and prevent outside verification, ensuring you stay in the scam. No real investigation, court case, or bank process ever requires total secrecy from your own family. \"Sub-judice\" does not mean you are forbidden from telling your spouse or child that someone called you. Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam.",
         "source": "1930 National Cyber Crime Helpline public guidance"
       }
     ]
@@ -34,7 +34,7 @@
         "plain_name": "A payment trick disguised as receiving money",
         "span": "open your UPI app and accept the payment request we are sending now, then enter your UPI PIN to confirm receipt.",
         "confidence": 1.0,
-        "explanation": "\"open your UPI app and accept the payment request we are sending now, then enter your UPI PIN to confirm receipt.\" is a sign of a payment trick disguised as receiving money. On UPI, you only ever need to scan a QR code or enter your PIN to SEND money — never to receive it. If approving something requires your UPI PIN, money is leaving your account, not arriving. Never enter your UPI PIN to 'receive' a payment. If a PIN is required, stop — you are about to pay, not get paid.",
+        "explanation": "\"open your UPI app and accept the payment request we are sending now, then enter your UPI PIN to confirm receipt.\" — To trick you into confirming the transfer by making it seem like you're receiving money. On UPI, you only ever need to scan a QR code or enter your PIN to SEND money — never to receive it. If approving something requires your UPI PIN, money is leaving your account, not arriving. Never enter your UPI PIN to 'receive' a payment. If a PIN is required, stop — you are about to pay, not get paid.",
         "source": "RBI and NPCI public awareness guidance on UPI fraud"
       }
     ]
@@ -49,8 +49,8 @@
         "technique": "reciprocity_hook",
         "plain_name": "An unexpected gift or refund",
         "span": "Hi Mom, I lost my phone and this is a friend's number I'm using for now.",
-        "confidence": 0.8,
-        "explanation": "\"Hi Mom, I lost my phone and this is a friend's number I'm using for now.\" is a sign of an unexpected gift or refund. Legitimate refunds, prizes, or cashback are never released only after you first pay a \"processing fee\" or share your card/PIN details. Ignore it. A real refund from a bank or company never requires you to pay first to receive it.",
+        "confidence": 0.85,
+        "explanation": "\"Hi Mom, I lost my phone and this is a friend's number I'm using for now.\" — To create a sense of obligation, making you want to help or respond right away. Legitimate refunds, prizes, or cashback are never released only after you first pay a \"processing fee\" or share your card/PIN details. Ignore it. A real refund from a bank or company never requires you to pay first to receive it.",
         "source": "I4C advisory on lottery and prize-based frauds"
       },
       {
@@ -58,7 +58,7 @@
         "plain_name": "Telling you to keep it secret",
         "span": "please don't call Dad about it, he'll just worry.",
         "confidence": 0.9,
-        "explanation": "\"please don't call Dad about it, he'll just worry.\" is a sign of telling you to keep it secret. No real investigation, court case, or bank process ever requires total secrecy from your own family. \"Sub-judice\" does not mean you are forbidden from telling your spouse or child that someone called you. Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam.",
+        "explanation": "\"please don't call Dad about it, he'll just worry.\" — To isolate you and prevent verification of the scam. No real investigation, court case, or bank process ever requires total secrecy from your own family. \"Sub-judice\" does not mean you are forbidden from telling your spouse or child that someone called you. Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam.",
         "source": "1930 National Cyber Crime Helpline public guidance"
       }
     ]
@@ -70,19 +70,11 @@
     "is_clean": false,
     "cards": [
       {
-        "technique": "manufactured_urgency",
-        "plain_name": "A fake deadline",
-        "span": "within the next 2 hours and share your bank details for the prize transfer",
-        "confidence": 1.0,
-        "explanation": "\"within the next 2 hours and share your bank details for the prize transfer\" is a sign of a fake deadline. No genuine government agency, court, or bank ever requires you to act within a few hours. Real legal and financial processes always allow time for you to verify, consult a lawyer, or call the institution directly. Take the time anyway. A real deadline can survive you calling to verify it first.",
-        "source": "I4C (Indian Cyber Crime Coordination Centre) public advisory on digital arrest scams"
-      },
-      {
         "technique": "fake_scarcity",
         "plain_name": "Only a few spots left",
-        "span": "Only 3 winners have been selected today",
+        "span": "Only 3 winners have been selected today.",
         "confidence": 1.0,
-        "explanation": "\"Only 3 winners have been selected today\" is a sign of only a few spots left. Genuine limited-time offers from real banks or businesses are also described on their official website or app — if you can't find it there, the urgency is manufactured. Check the offer independently on the official website or app before acting. If it's real, it'll still be there in ten minutes.",
+        "explanation": "\"Only 3 winners have been selected today.\" — To make you act quickly without verifying the offer's authenticity. Genuine limited-time offers from real banks or businesses are also described on their official website or app — if you can't find it there, the urgency is manufactured. Check the offer independently on the official website or app before acting. If it's real, it'll still be there in ten minutes.",
         "source": "I4C consumer fraud advisory"
       }
     ]

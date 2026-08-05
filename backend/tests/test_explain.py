@@ -8,51 +8,44 @@ from app.counter_moves import load_counter_moves
 from app.explain import (
     MAX_PURPOSE_WORDS,
     _fallback_explanation,
-    validate_purpose_sentence,
+    validate_purpose_clause,
 )
 from app.taxonomy import Detection, Technique
 
 
-def test_valid_sentence_passes():
+def test_valid_purpose_passes():
     span = "do not tell your family"
-    sentence = f'The instruction "{span}" exists to stop anyone from calling you before you send money.'
-    assert validate_purpose_sentence(sentence, span) == []
+    purpose = "This exists to stop anyone from calling you before you send money."
+    assert validate_purpose_clause(purpose, span) == []
 
 
-def test_missing_span_fails():
-    problems = validate_purpose_sentence("This creates urgency to rush you.", "within 2 hours")
-    assert any("verbatim span" in p for p in problems)
-
-
-def test_span_present_but_unquoted_fails():
-    """A real failure seen in practice: the model copies the span verbatim
-    but drops the quotation marks, producing a run-on sentence when
-    concatenated with the reality-check text."""
+def test_purpose_repeating_span_fails():
+    """A real failure seen in practice: the model just echoes the span back
+    instead of explaining why it's being used."""
     span = "Only 3 winners have been selected today"
-    sentence = f"{span} which creates false scarcity to rush your decision."
-    problems = validate_purpose_sentence(sentence, span)
-    assert any("not wrapped in quotation marks" in p for p in problems)
+    purpose = f"{span} which creates false scarcity to rush your decision."
+    problems = validate_purpose_clause(purpose, span)
+    assert any("repeats the verbatim span" in p for p in problems)
 
 
 def test_too_long_fails():
     span = "act now"
-    sentence = f'"{span}" ' + "word " * (MAX_PURPOSE_WORDS + 5)
-    problems = validate_purpose_sentence(sentence, span)
+    purpose = "word " * (MAX_PURPOSE_WORDS + 5)
+    problems = validate_purpose_clause(purpose, span)
     assert any("too long" in p for p in problems)
 
 
 def test_hedging_phrase_fails():
     span = "CBI officer"
-    sentence = f'"{span}" might be a scam and you should be careful.'
-    problems = validate_purpose_sentence(sentence, span)
+    purpose = "This might be a scam and you should be careful."
+    problems = validate_purpose_clause(purpose, span)
     assert any("hedging" in p for p in problems)
 
 
-def test_valid_sentence_at_word_boundary_passes():
-    span = "urgent"
-    words = ["word"] * (MAX_PURPOSE_WORDS - 1) + [f'"{span}"']
-    sentence = " ".join(words)
-    assert validate_purpose_sentence(sentence, span) == []
+def test_valid_purpose_at_word_boundary_passes():
+    words = ["word"] * MAX_PURPOSE_WORDS
+    purpose = " ".join(words)
+    assert validate_purpose_clause(purpose, "urgent") == []
 
 
 def test_fallback_explanation_is_table_only_and_grounded():
