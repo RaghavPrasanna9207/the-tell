@@ -2,17 +2,26 @@
 
 Same sample as `label.py` (target=250, seed=42), so this is an alternate,
 spreadsheet-based front end for the exact same gold set — not a different
-sample. Existing answers in `labels_primary.jsonl` are pre-filled with an
+sample. Existing answers in `labels_{annotator}.jsonl` are pre-filled with an
 "x" in the matching technique column so you don't re-answer from scratch;
 unanswered rows are left blank. A `notes` column carries a short list of
 specific rows flagged during a manual review of the first-pass answers —
 each is a suggestion to reconsider, not an automatic correction.
+
+Default usage exports the full 250-message primary set, exactly as before.
+Pass --annotator and --kappa-subset together to produce a small,
+easy-to-hand-off sheet for a second annotator (see the plan's Phase A4 /
+eval/kappa.py) — e.g. a friend labeling 80 messages in a spreadsheet is a
+much smaller ask than cloning the repo and running a CLI script:
+
+    python eval/export_labeling_sheet.py --annotator second --kappa-subset 80
 
 Run: python eval/export_labeling_sheet.py
 Then fill in backend/data/corpus/gold/gold_labeling.xlsx by hand, and run
 eval/import_labeling_sheet.py to turn it back into labels_primary.jsonl.
 """
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -27,8 +36,6 @@ from eval.label import LABELS_DIR, build_sample, load_corpus, load_existing_labe
 
 TARGET = 250
 SEED = 42
-OUTPUT_PATH = LABELS_DIR / "gold_labeling.xlsx"
-EXISTING_PATH = LABELS_DIR / "labels_primary.jsonl"
 
 TECHNIQUES = list(Technique)
 
@@ -110,20 +117,36 @@ def build_legend_sheet(wb: Workbook) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--annotator", default="primary", help="Label suffix, e.g. 'primary' or 'second'")
+    parser.add_argument(
+        "--kappa-subset",
+        type=int,
+        default=None,
+        help="Only export the first N messages of the sample (matches eval/label.py's --kappa-subset)",
+    )
+    args = parser.parse_args()
+
+    is_default = args.annotator == "primary" and args.kappa_subset is None
+    output_path = LABELS_DIR / ("gold_labeling.xlsx" if is_default else f"gold_labeling_{args.annotator}.xlsx")
+    existing_path = LABELS_DIR / f"labels_{args.annotator}.jsonl"
+
     records = load_corpus()
     sample = build_sample(records, TARGET, SEED)
-    existing = load_existing_labels(EXISTING_PATH)
+    if args.kappa_subset:
+        sample = sample[: args.kappa_subset]
+    existing = load_existing_labels(existing_path)
 
     wb = Workbook()
     build_labels_sheet(wb, sample, existing)
     build_legend_sheet(wb)
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(OUTPUT_PATH)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(output_path)
 
     prefilled = sum(1 for r in sample if r["id"] in existing)
     flagged = sum(1 for r in sample if r["id"] in REVIEW_NOTES)
-    print(f"Wrote {OUTPUT_PATH}")
+    print(f"Wrote {output_path}")
     print(f"Sample size: {len(sample)}  |  Pre-filled from existing answers: {prefilled}  |  Flagged for review: {flagged}")
 
 

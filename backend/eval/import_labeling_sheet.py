@@ -5,12 +5,20 @@ that technique applies to that row. Writes one JSON object per row to
 labels_primary.jsonl, in the schema eval/label.py itself produces, so
 nothing downstream (compare.py, distill.py, etc.) needs to change.
 
-The previous labels_primary.jsonl is copied to labels_primary.jsonl.bak
+The previous labels_{annotator}.jsonl is copied to labels_{annotator}.jsonl.bak
 before being overwritten.
+
+Default usage imports gold_labeling.xlsx into labels_primary.jsonl, exactly
+as before. Pass --annotator to match a sheet produced by
+export_labeling_sheet.py --annotator <name> (see the plan's Phase A4 /
+eval/kappa.py — a second annotator's kappa-subset sheet, for example):
+
+    python eval/import_labeling_sheet.py --annotator second
 
 Run: python eval/import_labeling_sheet.py
 """
 
+import argparse
 import json
 import shutil
 import sys
@@ -23,19 +31,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.taxonomy import Technique
 from eval.label import LABELS_DIR
 
-SHEET_PATH = LABELS_DIR / "gold_labeling.xlsx"
-OUTPUT_PATH = LABELS_DIR / "labels_primary.jsonl"
-BACKUP_PATH = LABELS_DIR / "labels_primary.jsonl.bak"
-
 TECHNIQUE_VALUES = [t.value for t in Technique]
 
 
 def main() -> None:
-    if not SHEET_PATH.exists():
-        print(f"ERROR: {SHEET_PATH} not found. Run eval/export_labeling_sheet.py first.")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--annotator", default="primary", help="Label suffix, e.g. 'primary' or 'second'")
+    args = parser.parse_args()
+
+    is_default = args.annotator == "primary"
+    sheet_path = LABELS_DIR / ("gold_labeling.xlsx" if is_default else f"gold_labeling_{args.annotator}.xlsx")
+    output_path = LABELS_DIR / f"labels_{args.annotator}.jsonl"
+    backup_path = LABELS_DIR / f"labels_{args.annotator}.jsonl.bak"
+
+    if not sheet_path.exists():
+        print(f"ERROR: {sheet_path} not found. Run eval/export_labeling_sheet.py first.")
         sys.exit(1)
 
-    wb = load_workbook(SHEET_PATH, data_only=True)
+    wb = load_workbook(sheet_path, data_only=True)
     ws = wb["Labels"]
 
     header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
@@ -75,17 +88,17 @@ def main() -> None:
 
         records.append({"id": record_id, "text": text, "labels": labels})
 
-    if OUTPUT_PATH.exists():
-        shutil.copy(OUTPUT_PATH, BACKUP_PATH)
-        print(f"Backed up previous labels to {BACKUP_PATH}")
+    if output_path.exists():
+        shutil.copy(output_path, backup_path)
+        print(f"Backed up previous labels to {backup_path}")
 
-    with OUTPUT_PATH.open("w", encoding="utf-8") as f:
+    with output_path.open("w", encoding="utf-8") as f:
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     labeled = sum(1 for r in records if r["labels"])
     clean = sum(1 for r in records if not r["labels"])
-    print(f"Wrote {len(records)} rows to {OUTPUT_PATH}")
+    print(f"Wrote {len(records)} rows to {output_path}")
     print(f"  with >=1 technique: {labeled}  |  none (clean): {clean}  |  not yet reviewed (skipped): {skipped_unreviewed}")
 
 

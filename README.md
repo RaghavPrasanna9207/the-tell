@@ -101,9 +101,9 @@ cd frontend && npm run dev
 ## Testing
 
 ```bash
-cd backend && pytest        # 62 tests: taxonomy/counter-move integrity,
-                             # classify/explain logic, metrics, full /analyze
-                             # pipeline (mocked at the LLM boundary)
+cd backend && pytest        # 87 tests: taxonomy/counter-move integrity,
+                             # classify/explain logic, metrics, cascade gate,
+                             # full /analyze pipeline (mocked at the LLM boundary)
 python eval/run_eval.py     # baseline classifier metrics against the corpus
 ```
 
@@ -125,6 +125,20 @@ python backend/eval/distill.py
 
 # Three-way baseline/teacher/student comparison against the gold set
 python backend/eval/compare.py
+
+# Measure the cascade gate's scam-recall / teacher-wake-rate trade-off
+python backend/eval/gate_calibration.py
+
+# Get a second annotator (not a study participant — see below) to label the
+# 80-message kappa subset, either via CLI:
+python backend/eval/label.py --annotator second --kappa-subset 80
+# ...or hand them a small spreadsheet instead of asking them to run Python:
+python backend/eval/export_labeling_sheet.py --annotator second --kappa-subset 80
+#   -> send them gold_labeling_second.xlsx, they fill it in, you get it back
+python backend/eval/import_labeling_sheet.py --annotator second
+
+# Cohen's kappa between labels_primary.jsonl and labels_second.jsonl
+python backend/eval/kappa.py
 
 # One-time: freeze Layer 1/2 output for the study's 6 fixed stimuli
 python study/build_stimuli_cache.py
