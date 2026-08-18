@@ -35,6 +35,7 @@ from transformers import (
     TrainingArguments,
 )
 
+from app.student import STUDENT_MODEL_DIR
 from app.taxonomy import Technique
 from eval.baseline import load_gold_as_arrays
 from eval.gold import DRAFT_GOLD_WARNING, GOLD_NOTE, load_draft_gold, load_real_gold
@@ -43,7 +44,6 @@ from eval.metrics import format_report, per_technique_metrics
 MODEL_NAME = "answerdotai/ModernBERT-base"
 SILVER_LABELS_PATH = Path(__file__).parent.parent / "data" / "corpus" / "processed" / "silver_labels.jsonl"
 HANDCRAFTED_TRAIN_PATH = Path(__file__).parent.parent / "data" / "corpus" / "raw" / "handcrafted_india_train.jsonl"
-STUDENT_MODEL_DIR = Path(__file__).parent.parent / "models" / "student"
 
 
 def load_handcrafted_train() -> list[dict]:

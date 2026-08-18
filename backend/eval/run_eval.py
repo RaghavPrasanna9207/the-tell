@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from eval.baseline import load_gold_as_arrays, run_baseline_cv
 from eval.gold import GOLD_NOTE, load_real_gold
-from eval.metrics import format_report, per_technique_metrics
+from eval.metrics import format_report, per_technique_metrics, per_technique_metrics_cv
 
 
 def main() -> None:
@@ -33,8 +33,23 @@ def main() -> None:
     texts, y_true, technique_names = load_gold_as_arrays(records)
     y_proba = run_baseline_cv(texts, y_true)
 
-    results = per_technique_metrics(y_true, y_proba, technique_names)
-    print(format_report(results, "BASELINE: TF-IDF + Logistic Regression (5-fold CV, out-of-fold predictions)"))
+    in_sample = per_technique_metrics(y_true, y_proba, technique_names)
+    print(
+        format_report(
+            in_sample,
+            "BASELINE: TF-IDF + Logistic Regression (5-fold CV probabilities, "
+            "IN-SAMPLE threshold - upper bound, see eval/compare.py for held-out)",
+        )
+    )
+
+    cv = per_technique_metrics_cv(y_true, y_proba, technique_names)
+    print(
+        format_report(
+            cv,
+            "BASELINE: TF-IDF + Logistic Regression (5-fold CV probabilities, "
+            "HELD-OUT 5-fold threshold CV - genuine generalization estimate)",
+        )
+    )
 
     print(
         "\nNo positive examples for a technique in the eval set means its P/R/F1 "

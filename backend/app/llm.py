@@ -7,16 +7,20 @@ is deliberately no JSON-repair or retry-until-parseable loop here — if this
 raises, the schema itself is wrong, not the model's output.
 """
 
+import json
+import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 import ollama
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 TEACHER_MODEL = "qwen2.5:7b-instruct-q4_K_M"
 
 T = TypeVar("T", bound=BaseModel)
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaUnavailableError(RuntimeError):
@@ -31,6 +35,11 @@ class GenerationResult:
     text: str
     elapsed_seconds: float
     model: str
+    clamped_fields: list[str] = field(default_factory=list)
+    """Dotted field paths (e.g. "detections.0.confidence") whose value was
+    out of its declared Field(ge=..., le=...) range and got clamped to the
+    nearest bound rather than raising. Non-empty only in the rare case
+    documented on `_clamp_range_violations`. Empty on every normal call."""
 
 
 def _client() -> ollama.Client:
@@ -56,6 +65,34 @@ def check_available(model: str = TEACHER_MODEL) -> None:
         )
 
 
+def _clamp_range_violations(raw: dict, errors: list[dict]) -> list[str] | None:
+    """Self-heal the one thing schema-constrained decoding does NOT
+    guarantee: numeric fields land within their declared Field(ge=..., le=...)
+    bounds. The sampler enforces JSON *shape* (e.g. `confidence` is a float),
+    not the *range* Pydantic separately checks — in practice the teacher
+    occasionally emits a confidence like 1.3 (seen ~0.2-5% of calls). That's
+    a values-out-of-range problem, not a malformed-JSON problem, so clamping
+    it here is not the "JSON repair" this module's docstring rules out.
+
+    Returns the list of dotted-path fields that were clamped, or None if any
+    error isn't a plain ge/le violation — in that case the caller re-raises,
+    since a shape-level validation failure is a real bug worth investigating.
+    """
+    if not errors or not all(e["type"] in ("greater_than_equal", "less_than_equal") for e in errors):
+        return None
+
+    clamped: list[str] = []
+    for err in errors:
+        loc = err["loc"]
+        bound = err["ctx"]["ge"] if err["type"] == "greater_than_equal" else err["ctx"]["le"]
+        target = raw
+        for key in loc[:-1]:
+            target = target[key]
+        target[loc[-1]] = bound
+        clamped.append(".".join(str(p) for p in loc))
+    return clamped
+
+
 def generate_structured(
     prompt: str,
     schema: type[T],
@@ -65,10 +102,11 @@ def generate_structured(
 ) -> tuple[T, GenerationResult]:
     """Generate output constrained to `schema`'s JSON schema, then validate
     it into an instance of `schema`. Raises OllamaUnavailableError if the
-    server/model isn't available, or pydantic.ValidationError if the model
-    (very unusually, given constrained decoding) produces something that
-    doesn't fit — that should be rare enough to be worth investigating, not
-    silently retried.
+    server/model isn't available. A ge/le range violation (see
+    `_clamp_range_violations`) is clamped and logged rather than raised;
+    any other pydantic.ValidationError means the model (very unusually,
+    given constrained decoding) produced something structurally unexpected
+    — that's rare enough to be worth investigating, not silently retried.
     """
     check_available(model)
 
@@ -88,6 +126,17 @@ def generate_structured(
     elapsed = time.monotonic() - start
 
     content = response["message"]["content"]
-    parsed = schema.model_validate_json(content)
+    clamped_fields: list[str] = []
+    try:
+        parsed = schema.model_validate_json(content)
+    except ValidationError as exc:
+        raw = json.loads(content)
+        clamped_fields = _clamp_range_violations(raw, exc.errors()) or []
+        if not clamped_fields:
+            raise
+        logger.warning("Clamped out-of-range field(s) %s in %s output", clamped_fields, model)
+        parsed = schema.model_validate(raw)
 
-    return parsed, GenerationResult(text=content, elapsed_seconds=elapsed, model=model)
+    return parsed, GenerationResult(
+        text=content, elapsed_seconds=elapsed, model=model, clamped_fields=clamped_fields
+    )

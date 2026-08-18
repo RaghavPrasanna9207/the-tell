@@ -13,11 +13,13 @@ from dataclasses import dataclass
 
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.model_selection import KFold
 
 FN_WEIGHT = 8  # false negative: missed a real manipulation technique
 FP_WEIGHT = 1  # false positive: flagged a technique that wasn't there
 
 THRESHOLD_GRID = np.arange(0.05, 1.0, 0.05)
+CALIBRATION_FOLDS = 5
 
 
 @dataclass
@@ -42,48 +44,110 @@ def _cost(y_true_col: np.ndarray, y_pred_col: np.ndarray) -> float:
     return FN_WEIGHT * fn + FP_WEIGHT * fp
 
 
+def _select_threshold(y_true_col: np.ndarray, proba_col: np.ndarray) -> float:
+    """Sweep THRESHOLD_GRID and return the threshold minimizing cost-weighted
+    error on the given (y_true_col, proba_col). Note this is agnostic to
+    whether the caller passes in-sample or held-out data — it's the
+    "held-out" property of *what gets passed in* that matters, not this
+    function.
+    """
+    best_threshold = 0.5
+    best_cost = float("inf")
+    for threshold in THRESHOLD_GRID:
+        y_pred_col = (proba_col >= threshold).astype(int)
+        cost = _cost(y_true_col, y_pred_col)
+        if cost < best_cost:
+            best_cost = cost
+            best_threshold = float(threshold)
+    return best_threshold
+
+
+def _score_at_threshold(y_true_col: np.ndarray, y_pred_col: np.ndarray, threshold: float, name: str) -> TechniqueResult:
+    tp = int(np.sum((y_true_col == 1) & (y_pred_col == 1)))
+    fp = int(np.sum((y_true_col == 0) & (y_pred_col == 1)))
+    fn = int(np.sum((y_true_col == 1) & (y_pred_col == 0)))
+    tn = int(np.sum((y_true_col == 0) & (y_pred_col == 0)))
+    return TechniqueResult(
+        technique=name,
+        threshold=threshold,
+        precision=precision_score(y_true_col, y_pred_col, zero_division=0),
+        recall=recall_score(y_true_col, y_pred_col, zero_division=0),
+        f1=f1_score(y_true_col, y_pred_col, zero_division=0),
+        cost=_cost(y_true_col, y_pred_col),
+        tp=tp,
+        fp=fp,
+        fn=fn,
+        tn=tn,
+        support=int(np.sum(y_true_col)),
+    )
+
+
 def per_technique_metrics(
     y_true: np.ndarray, y_proba: np.ndarray, technique_names: list[str]
 ) -> list[TechniqueResult]:
     """For each technique (column), sweep THRESHOLD_GRID and pick the
     threshold that minimizes cost-weighted error, then report P/R/F1 at
-    that threshold.
+    that threshold — evaluated on the SAME data the threshold was chosen
+    from. This is in-sample threshold selection: every number here is an
+    upper bound on what a threshold picked without seeing these labels
+    would achieve, especially for techniques with only a handful of
+    positives. See `per_technique_metrics_cv` for the held-out variant, and
+    ERROR_ANALYSIS.md for why this matters here.
     """
     results = []
     for i, name in enumerate(technique_names):
         y_true_col = y_true[:, i]
         proba_col = y_proba[:, i]
+        threshold = _select_threshold(y_true_col, proba_col)
+        y_pred_col = (proba_col >= threshold).astype(int)
+        results.append(_score_at_threshold(y_true_col, y_pred_col, threshold, name))
+    return results
 
-        best_threshold = 0.5
-        best_cost = float("inf")
-        for threshold in THRESHOLD_GRID:
-            y_pred_col = (proba_col >= threshold).astype(int)
-            cost = _cost(y_true_col, y_pred_col)
-            if cost < best_cost:
-                best_cost = cost
-                best_threshold = float(threshold)
 
-        y_pred_col = (proba_col >= best_threshold).astype(int)
-        tp = int(np.sum((y_true_col == 1) & (y_pred_col == 1)))
-        fp = int(np.sum((y_true_col == 0) & (y_pred_col == 1)))
-        fn = int(np.sum((y_true_col == 1) & (y_pred_col == 0)))
-        tn = int(np.sum((y_true_col == 0) & (y_pred_col == 0)))
+def per_technique_metrics_cv(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    technique_names: list[str],
+    n_splits: int = CALIBRATION_FOLDS,
+    seed: int = 42,
+) -> list[TechniqueResult]:
+    """Held-out threshold selection via K-fold: for each fold, the
+    per-technique threshold is chosen by cost-minimization on the OTHER
+    folds only, then applied to score this fold. Concatenating every fold's
+    held-out predictions gives every message a prediction from a threshold
+    that never saw its own label — a genuine generalization estimate,
+    unlike `per_technique_metrics`.
 
-        results.append(
-            TechniqueResult(
-                technique=name,
-                threshold=best_threshold,
-                precision=precision_score(y_true_col, y_pred_col, zero_division=0),
-                recall=recall_score(y_true_col, y_pred_col, zero_division=0),
-                f1=f1_score(y_true_col, y_pred_col, zero_division=0),
-                cost=best_cost,
-                tp=tp,
-                fp=fp,
-                fn=fn,
-                tn=tn,
-                support=int(np.sum(y_true_col)),
-            )
-        )
+    K-fold rather than a single calibration/test split: several techniques
+    have single-digit gold support (as low as 3), so a static split could
+    leave a technique with 0-1 positives in the test half, making that
+    row's F1 a coin flip on the split's luck rather than a real signal.
+    K-fold uses every message for both calibration and (held-out)
+    evaluation, at the cost of a `threshold` column that's now a mean
+    across folds rather than one fixed value — low-support techniques will
+    still show real fold-to-fold instability; that instability is the
+    honest finding, not a bug in this function.
+
+    Does not retrain any model - y_proba is already-computed probabilities
+    (from a live teacher call or a single student forward pass); this only
+    cross-validates the threshold-selection step against them.
+    """
+    n = y_true.shape[0]
+    kf = KFold(n_splits=min(n_splits, n), shuffle=True, random_state=seed)
+    fold_indices = list(kf.split(np.arange(n)))
+
+    results = []
+    for i, name in enumerate(technique_names):
+        y_true_col = y_true[:, i]
+        proba_col = y_proba[:, i]
+        y_pred_col = np.zeros(n, dtype=int)
+        fold_thresholds = []
+        for train_idx, test_idx in fold_indices:
+            threshold = _select_threshold(y_true_col[train_idx], proba_col[train_idx])
+            fold_thresholds.append(threshold)
+            y_pred_col[test_idx] = (proba_col[test_idx] >= threshold).astype(int)
+        mean_threshold = float(np.mean(fold_thresholds))
+        results.append(_score_at_threshold(y_true_col, y_pred_col, mean_threshold, name))
     return results
 
 
