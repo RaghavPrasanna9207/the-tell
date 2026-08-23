@@ -108,6 +108,7 @@ def build_legend_sheet(wb: Workbook) -> None:
     ws.append(["Common mix-ups:", ""])
     ws.append(["manufactured_urgency (time deadline) vs fake_scarcity (quantity/slots limited)", ""])
     ws.append(["false_authority (impersonates an institution) vs trust_transfer (impersonates a specific known person)", ""])
+    ws.append(["reciprocity_hook: a bare prize-claim ('you've won, call to claim a £2000 bonus') counts on its own — you do NOT need an explicit 'do me a favor in return' ask for this to apply.", ""])
 
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 90

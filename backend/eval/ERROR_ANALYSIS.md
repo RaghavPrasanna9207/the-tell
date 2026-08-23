@@ -1,7 +1,76 @@
 # Error analysis + class-imbalance story
 
 Written against the real gold set (N=250, `data/corpus/gold/labels_primary.jsonl`,
-every message individually reviewed, single annotator — no Cohen's kappa yet).
+every message individually reviewed by a single primary annotator; see the
+2026-08-23 update below for Cohen's kappa against a second annotator on an
+80-message subset).
+
+## 2026-08-23: Cohen's kappa on the 80-message subset (Phase A4)
+
+A second annotator labeled the same 80-message kappa subset via the Excel
+handoff (`eval/export_labeling_sheet.py --annotator second`, filled in
+independently with no access to the primary labels, then
+`eval/import_labeling_sheet.py --annotator second`). `eval/kappa.py` compares
+`labels_primary.jsonl` vs `labels_second.jsonl` on the shared 80 ids.
+
+**Macro-average kappa: 0.68** (over all 11 techniques) — above the plan's 0.6
+threshold, so per the plan's own rule ("if kappa < 0.6, fix the taxonomy, not
+the number") the taxonomy is not flagged as broken overall. Message-level
+agreement, which is better-powered because it uses all 80 messages rather
+than a per-technique sliver: "any technique present" binary kappa 0.66, exact
+label-set match rate 0.70, mean Jaccard similarity 0.79.
+
+Per-technique, most techniques land in the 0.66-1.00 range with reasonable
+agreement. One technique is a genuine outlier: **`reciprocity_hook` kappa =
+-0.02** (primary marked it 14 times, second only once — essentially no
+correlation, not just low support). Looking at the disagreements, this isn't
+noise, it's a real definitional split: the primary annotator marked classic
+UK-lottery-style spam ("you have won a £2000 prize, call to claim", "free
+ringtone waiting for you") as `reciprocity_hook` (the "free gift" *is* the
+reciprocity hook), while the second annotator treated these as `none` or
+`manufactured_urgency`/`channel_switch` only, apparently reading
+`reciprocity_hook` more narrowly as requiring an explicit unsolicited-favor
+setup (closer to the "Mom I lost my phone" / "I sent you money by mistake"
+pattern) rather than a bare prize-claim hook. 7 of the 24 total label-set
+disagreements are exactly this pattern (`uci-00042`, `uci-00056`,
+`uci-00095`, `uci-01970`, `uci-02119`, `uci-02525`, `uci-02987`, `uci-03010`,
+`uci-03409`, `uci-04086`, `uci-04754`, `uci-04841` — the `reciprocity_hook`
+column specifically).
+
+**Fixed the same day**, since `counter_moves.yaml`'s own source for this
+technique ("I4C advisory on lottery and prize-based frauds") already backed
+the primary annotator's broader reading — the taxonomy's intent was never
+ambiguous, only its written wording was. `app/taxonomy.py`'s
+`RECIPROCITY_HOOK` enum docstring and `TECHNIQUE_DESCRIPTIONS` entry (used
+both in the Layer 1 classifier prompt and the labeling legend, per the
+"keep the two in sync" note in that file) now say explicitly that a bare
+prize-claim counts on its own, with no separate "do me a favor in return"
+ask required. `eval/export_labeling_sheet.py`'s Legend sheet got a matching
+"Common mix-ups" line. `gold_labeling_second.xlsx` was regenerated from the
+fixed definitions (labels unchanged — the 80 existing answers round-tripped
+back in via `labels_second.jsonl`).
+
+The recorded 0.68 macro-kappa / -0.02 `reciprocity_hook` kappa above is the
+honest, un-fudged number from *before* this fix and is kept as-is — it's the
+evidence that motivated the fix, not something to retroactively improve by
+relabeling. A future kappa run against a definition-aware second annotator
+would be the real test of whether the fix worked, not a re-score of the same
+80 answers.
+
+A smaller secondary pattern: the second annotator layered `verification_theater`
+on top of the primary's labels on several digital-arrest-style messages
+(`IN-003`, `IN-004`, `IN-006`, `IN-011`) that mention an FIR copy, an ID card,
+or "funds verified" — reading those mentions as verification theater more
+liberally than the primary did. Worth a note in the legend, but with
+`verification_theater` kappa = 0.71 on n=4/7 support this is closer to normal
+borderline disagreement than the `reciprocity_hook` split.
+
+Several other techniques (`isolation`, `verification_theater`,
+`channel_switch`, `payment_irreversibility`, `trust_transfer`, `fake_scarcity`,
+`sunk_cost_pressure`) have single-digit support even on this subset — their
+kappa values are individually close to statistical noise (see `eval/kappa.py`'s
+support-flagging) and shouldn't be read as precise per-technique reliability
+scores, only as "not contradicted by this sample."
 
 ## 2026-08-18: the student is now a real part of the running system
 
@@ -344,9 +413,10 @@ meaningfully different from a flag with a label attached.
 
 ## Not covered here
 
-- Inter-annotator agreement (Cohen's kappa) — no second annotator yet, so
-  it's still unknown how much of the "true" label for a borderline message
-  (e.g. is `IN-B10` really zero-technique, or does its PIN/OTP language
-  deserve a low-confidence tag?) reflects real signal vs. one annotator's
-  judgment call. ~~A held-out threshold-calibration split~~ — done, see the
-  2026-08-18 update at the top of this file.
+- ~~Inter-annotator agreement (Cohen's kappa)~~ — done, see the 2026-08-23
+  update at the top of this file. Still open: it's only measured on an
+  80-message subset, and only against `labels_primary.jsonl`'s judgment calls
+  — e.g. whether `IN-B10` is really zero-technique isn't itself re-litigated,
+  only how consistently a second person would apply the same taxonomy.
+  ~~A held-out threshold-calibration split~~ — done, see the 2026-08-18
+  update at the top of this file.

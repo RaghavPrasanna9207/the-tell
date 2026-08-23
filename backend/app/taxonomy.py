@@ -42,7 +42,9 @@ class Technique(str, Enum):
     """Impersonating a known person or brand — "Mom, I lost my phone"."""
 
     RECIPROCITY_HOOK = "reciprocity_hook"
-    """Unsolicited gift, prize, "refund owed to you"."""
+    """Unsolicited gift, prize, "refund owed to you" — a bare prize-claim
+    ("you've won, call to claim") counts on its own, no explicit ask for a
+    favor in return is required."""
 
     FAKE_SCARCITY = "fake_scarcity"
     """"Only 3 slots left", "offer expires"."""
@@ -93,7 +95,9 @@ TECHNIQUE_DESCRIPTIONS: dict[Technique, str] = {
     ),
     Technique.RECIPROCITY_HOOK: (
         "An unsolicited gift, prize, or refund offer designed to create a felt "
-        "obligation to respond."
+        "obligation to respond — e.g. 'you've won a £2000 bonus, call to claim' "
+        "counts on its own; the offer itself is the hook, no separate explicit "
+        "request for a favor in return is needed."
     ),
     Technique.FAKE_SCARCITY: (
         "An artificial limit meant to rush the decision — "
