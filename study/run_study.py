@@ -44,6 +44,18 @@ RESPONSE_LABELS = [
     "Call someone",
 ]
 
+# Single-letter codes for the spreadsheet front end (export_study_sheet.py /
+# import_study_sheet.py) — free-typed multi-word labels are what silently got
+# rejected by Excel's dropdown validation and reverted to blank during the
+# pilot, so the sheet asks for one letter per answer instead.
+RESPONSE_LETTER_CODES = {
+    "C": "comply",
+    "R": "reply",
+    "I": "ignore",
+    "V": "verify_independently",
+    "S": "call_someone",
+}
+
 
 def load_cache() -> dict:
     if not CACHE_PATH.exists():
