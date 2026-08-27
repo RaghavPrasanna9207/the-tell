@@ -12,11 +12,17 @@ verifiable facts, in language a person under pressure will actually believe.
 Fully local. No API key, no account, no cost — everything runs on-device via
 Ollama + a distilled local classifier.
 
+![Demo: pasting a digital-arrest scam message and getting back named-technique explanation cards](docs/demo.gif)
+
 **Status:** taxonomy, both layers, gold labeling, distillation, three-way eval,
 inter-annotator kappa, the student cascade (below), the human study (N=20,
-results below), and end-to-end UI verification are all complete. Deploy
-decision still open. See `CLAUDE.md` for project rules and the full plan at
-`~/.claude/plans/1-a-scam-shield-temporal-muffin.md`.
+results below), and end-to-end UI verification are all complete. No live
+public deploy: the actual product is the teacher's named-technique
+explanations, and that model can't run acceptably on a free CPU host, so a
+public demo would necessarily show a degraded, gate-only slice of it. The
+GIF above is the real thing, full strength, recorded against the live local
+stack — see "Running" below to run it yourself. See `CLAUDE.md` for project
+rules and the full plan at `~/.claude/plans/1-a-scam-shield-temporal-muffin.md`.
 
 ## Architecture
 
