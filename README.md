@@ -13,8 +13,9 @@ Fully local. No API key, no account, no cost — everything runs on-device via
 Ollama + a distilled local classifier.
 
 **Status:** taxonomy, both layers, gold labeling, distillation, three-way eval,
-and the student cascade (below) complete. Human study in progress. See
-`CLAUDE.md` for project rules and the full plan at
+inter-annotator kappa, the student cascade (below), the human study (N=20,
+results below), and end-to-end UI verification are all complete. Deploy
+decision still open. See `CLAUDE.md` for project rules and the full plan at
 `~/.claude/plans/1-a-scam-shield-temporal-muffin.md`.
 
 ## Architecture
@@ -112,9 +113,9 @@ python eval/run_eval.py     # baseline classifier metrics against the corpus
 Two spines: classifier performance (baseline vs. teacher vs. distilled student,
 cost-weighted for false negatives) and a small pre-registered human study testing
 whether named-technique explanations change stated behavior compared to a plain
-scam flag. Eval A results are below. See `study/PREREGISTRATION.md` for Eval B's
-hypothesis and analysis plan, committed before any participant runs — Eval B
-results and the full writeup land once the study completes.
+scam flag. Eval A results are below; Eval B (the human study) is complete and its
+results follow immediately after. See `study/PREREGISTRATION.md` for the
+hypothesis and analysis plan, committed before any participant ran.
 
 ```bash
 # Silver-label ~1000 corpus messages with the local teacher (for distillation)
@@ -151,8 +152,15 @@ python study/analyze_study.py
 ```
 
 **Honesty note:** the numbers below run against the real 250-message hand-labeled
-gold set (`backend/data/corpus/gold/labels_primary.jsonl`), single annotator —
-no second annotator or Cohen's kappa yet. Per-technique thresholds are chosen via
+gold set (`backend/data/corpus/gold/labels_primary.jsonl`), single-annotator
+labels for the classifier metrics themselves. A second annotator separately
+labeled an 80-message subset for inter-annotator agreement: macro-average
+Cohen's kappa = **0.68** (above the pre-registered 0.6 threshold), message-level
+binary ("any technique present") kappa 0.66, exact label-set match rate 0.70.
+One technique is a genuine outlier, not noise: `reciprocity_hook` kappa = -0.02,
+a real taxonomy-scope disagreement between annotators. Full breakdown in
+`backend/eval/ERROR_ANALYSIS.md`'s 2026-08-23 update (`eval/kappa.py`).
+Per-technique thresholds are chosen via
 5-fold cross-validation — each fold's threshold is picked using only the *other*
 folds, so every message is scored by a threshold that never saw its own label
 (`eval/metrics.py`'s `per_technique_metrics_cv`; `eval/compare.py` also prints the
@@ -247,3 +255,60 @@ first part. Fixed by narrowing the model's job to the purpose clause only and
 inserting the verbatim quote programmatically from the Layer 1 span. Re-verified
 against all 60 `handcrafted_india` messages after the fix: 59/59 cards (100%)
 passed validation on the first attempt, 0 retries, 0 fallbacks.
+
+### Results (Eval B — human study, N=20)
+
+20 participants, block-randomized 10 control / 10 treatment, 120 responses
+total (6 fixed stimuli each — 4 scam, 2 legitimate). Fixed analysis plan and
+hypotheses in `study/PREREGISTRATION.md`; reproduce with
+`python study/analyze_study.py`.
+
+| | Control | Treatment | Difference (treatment − control) |
+|---|---|---|---|
+| **H1 — resistant on 4 scam stimuli** | 39/40 = 0.97 | 39/40 = 0.97 | +0.00 (95% bootstrap CI [-0.07, +0.07]) |
+| **H2 — resistant/distrustful on 2 legitimate stimuli** | 17/20 = 0.85 | 16/20 = 0.80 | -0.05 (95% bootstrap CI [-0.30, +0.20]) |
+
+**H1 is a null result, reported as one.** Both arms already resist ~97% of
+the time on these four scam stimuli whether they see a named technique or
+just a plain flag — a ceiling effect that leaves little room for the
+explanation to move the needle in a forced-choice reading context. The CI is
+wide, as pre-registered N=20 was expected to produce, and is consistent with
+anywhere from a 7-point loss to a 7-point gain from the named-technique
+explanation. "No detectable difference on the primary outcome" is one of the
+two explicit "what would change our mind" outcomes named in the
+pre-registration, and it's reported as exactly that rather than reframed
+after the fact.
+
+**No H2 harm signal.** The point estimate trends in the reassuring
+direction — treatment participants were if anything slightly *less*
+distrustful of the two legitimate messages than control, not more — and the
+CI comfortably straddles zero. The concern that a named-technique explanation
+might train people to over-distrust real messages didn't show up in this
+sample.
+
+Per-stimulus counts (descriptive only — the pre-registration is explicit that
+the six stimuli are not six separate experiments, so this is for
+error-analysis, not inference):
+
+| Stimulus | Control resistant | Treatment resistant |
+|---|---|---|
+| S1 digital arrest | 10/10 | 10/10 |
+| S2 UPI collect request | 9/10 | 10/10 |
+| S3 family impersonation | 10/10 | 9/10 |
+| S4 lottery/prize | 10/10 | 10/10 |
+| S5 bank OTP (legitimate) | 9/10 | 8/10 |
+| S6 delivery notification (legitimate) | 8/10 | 8/10 |
+
+S5 and S6 are where most of the non-resistant responses cluster in both arms
+— the ceiling isn't quite 100% there either, which is the more interesting
+thread for anyone extending this study: the messages closest to genuinely
+fooling someone are also the ones where this N had the least room to show an
+effect either way.
+
+**Read this alongside Eval A, not instead of it.** The classifier eval above
+is the resume artifact — an accurate, fast, honestly-measured detection
+pipeline. This study asked a harder, adjacent question: does naming the
+technique, on top of that pipeline, change what a person says they'd do? At
+N=20 the honest answer is "no detectable effect, and no detected harm" — a
+well-designed null is a better interview story than a shaky significant one
+obtained by underpowering the caveats instead of the sample.
