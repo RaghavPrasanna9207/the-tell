@@ -78,7 +78,25 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>ScamShield Explainer</h1>
+      <div className="brand">
+        <svg
+          className="brand-mark"
+          width="30"
+          height="30"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 2.5 L19.5 5.3 V11 C19.5 16 16 19.8 12 21.5 C8 19.8 4.5 16 4.5 11 V5.3 Z" />
+          <circle cx="10.3" cy="10.3" r="2.6" />
+          <line x1="12.2" y1="12.2" x2="14.6" y2="14.6" />
+        </svg>
+        <h1>ScamShield Explainer</h1>
+      </div>
       <p className="subtitle">
         Paste a suspicious message. This tool names the manipulation technique being used on
         you, not just whether it looks like a scam.
@@ -132,7 +150,9 @@ export default function App() {
           {trustedContact && <a href={`tel:${trustedContact}`}>Call them now</a>}
         </div>
 
-        <a href="tel:1930">Call 1930 (National Cyber Crime Helpline)</a>
+        <a href="tel:1930" className="resource-primary">
+          Call 1930 (National Cyber Crime Helpline)
+        </a>
         <a href="https://cybercrime.gov.in" target="_blank" rel="noreferrer">
           Report at cybercrime.gov.in
         </a>
