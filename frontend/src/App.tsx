@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 
 const API_BASE = "http://localhost:8000";
-const TRUSTED_CONTACT_KEY = "scamshield_trusted_contact";
+const TRUSTED_CONTACT_KEY = "the_tell_trusted_contact";
 
 interface TechniqueCard {
   technique: string;
@@ -95,7 +95,7 @@ export default function App() {
           <circle cx="10.3" cy="10.3" r="2.6" />
           <line x1="12.2" y1="12.2" x2="14.6" y2="14.6" />
         </svg>
-        <h1>ScamShield Explainer</h1>
+        <h1>The Tell</h1>
       </div>
       <p className="subtitle">
         Paste a suspicious message. This tool names the manipulation technique being used on

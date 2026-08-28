@@ -1,4 +1,4 @@
-# ScamShield Explainer — Project Rules
+# The Tell — Project Rules
 
 A scam shield that explains the manipulation technique behind a message, not just flags it. Thesis: detection doesn't change behavior — counter-persuasion might. Built as a resume/interview artifact for an AI engineering role.
 

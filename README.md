@@ -1,4 +1,4 @@
-# ScamShield Explainer
+# The Tell
 
 A scam shield that explains the manipulation technique behind a message, not just flags it.
 
