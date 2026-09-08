@@ -1,0 +1,30 @@
+# Runtime-only dependencies: what /analyze needs to answer a request.
+#
+# Split out from requirements.txt (which is the dev/eval environment) because
+# the deployed image doesn't train, distill, score, or read spreadsheets.
+# Leaving scikit-learn, pandas, matplotlib, openpyxl, datasets and accelerate
+# out of the image removes several hundred MB and a large amount of surface
+# that never executes in production.
+#
+# torch is deliberately NOT pinned here, same as in requirements.txt, but for
+# the opposite reason: the serving image needs the CPU-only build, which has
+# to come from a different index. The Dockerfile installs it explicitly:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# A plain `pip install torch` here would pull the CUDA build (~2.5GB of
+# libraries that cannot run on a CPU-only host).
+
+# API
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+
+# Grounded fact table
+pyyaml>=6.0
+
+# Teacher backends
+ollama>=0.4          # LLM_BACKEND=ollama
+httpx>=0.27          # LLM_BACKEND=nim
+
+# Student gate (torch installed separately, see above)
+transformers>=4.51
+huggingface_hub>=0.26

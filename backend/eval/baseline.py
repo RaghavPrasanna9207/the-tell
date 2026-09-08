@@ -3,7 +3,7 @@
 This is the point of comparison that gives an accuracy number meaning. A
 strong classifier "94% accurate" on a skewed base rate isn't impressive on
 its own — showing what a simple linear baseline gets you first is what
-makes the harder models' numbers legible. See CLAUDE.md and the plan's
+makes the harder models' numbers legible. See docs/DESIGN_RULES.md and the plan's
 "Eval A" section.
 """
 

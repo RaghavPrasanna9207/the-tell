@@ -49,6 +49,15 @@ DATA_START_ROW = 3  # row 1 = legend banner, row 2 = column headers
 DATA_END_ROW = DATA_START_ROW - 1 + len(STIMULI)
 
 
+def _parse_yes_no(raw):
+    """Y/N cell -> bool, or None if missing/invalid. Excel sometimes coerces a
+    bare Y/N to a real bool on its own, so accept that too."""
+    if isinstance(raw, bool):
+        return raw
+    letter = raw.strip().upper() if isinstance(raw, str) else raw
+    return WARN_LETTER_TO_BOOL.get(letter)
+
+
 def _parse_responses_ws(ws, label: str) -> list[dict] | None:
     """Returns 6 validated response records, or None (with a printed
     reason) if the sheet isn't ready to import yet."""
@@ -71,14 +80,24 @@ def _parse_responses_ws(ws, label: str) -> list[dict] | None:
             print(f"  SKIP {label}: row {i + 1} 'confidence_1_to_5' is missing or invalid ({confidence!r})")
             return None
 
-        if isinstance(warn_raw, bool):
-            warn_others = warn_raw
+        warn_others = _parse_yes_no(warn_raw)
+        if warn_others is None:
+            print(f"  SKIP {label}: row {i + 1} 'would_warn_others' is missing or invalid ({warn_raw!r})")
+            return None
+
+        # Corrected H2 measure (PREREGISTRATION.md amendment 2026-09-08).
+        # A sheet exported before that amendment has only 6 columns, so
+        # row[6] would IndexError rather than fail cleanly — treat a
+        # short row as "old format, field not collected" (None), which is
+        # exactly how analyze_study.py already handles the 120 responses
+        # collected before this field existed.
+        if len(row) < 7:
+            believes_genuine = None
         else:
-            warn_letter = warn_raw.strip().upper() if isinstance(warn_raw, str) else warn_raw
-            if warn_letter not in WARN_LETTER_TO_BOOL:
-                print(f"  SKIP {label}: row {i + 1} 'would_warn_others' is missing or invalid ({warn_raw!r})")
+            believes_genuine = _parse_yes_no(row[6])
+            if believes_genuine is None:
+                print(f"  SKIP {label}: row {i + 1} 'is_message_genuine' is missing or invalid ({row[6]!r})")
                 return None
-            warn_others = WARN_LETTER_TO_BOOL[warn_letter]
 
         records.append(
             {
@@ -87,6 +106,7 @@ def _parse_responses_ws(ws, label: str) -> list[dict] | None:
                 "response": RESPONSE_LETTER_CODES[response_letter],
                 "confidence": int(confidence),
                 "warn_others": warn_others,
+                "believes_genuine": believes_genuine,
             }
         )
     return records
@@ -107,6 +127,12 @@ def append_responses(participant_id: str, arm: str, records: list[dict]) -> None
                         "response": r["response"],
                         "confidence": r["confidence"],
                         "warn_others": r["warn_others"],
+                        "believes_genuine": r["believes_genuine"],
+                        # NOTE: import time, not response time. A batch workbook
+                        # imports every participant in one call, so these cluster
+                        # within milliseconds of each other. That is an artifact
+                        # of the spreadsheet front end, not 20 people answering
+                        # simultaneously — see the README's study section.
                         "timestamp": now,
                     },
                     ensure_ascii=False,

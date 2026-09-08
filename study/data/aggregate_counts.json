@@ -1,0 +1,222 @@
+{
+  "_note": "Aggregate counts only - no per-participant rows, no ids, no linkage. study/data/ is gitignored (see PREREGISTRATION.md Data handling), so this file is what makes Eval B reproducible from a clone. analyze_study.py falls back to it when responses.jsonl is absent.",
+  "_n_participants": 20,
+  "_n_responses": 120,
+  "_collected": "2026-08-24 to 2026-08-27",
+  "cells": [
+    {
+      "stimulus_id": "S1_digital_arrest",
+      "arm": "control",
+      "kind": "scam",
+      "responses": {
+        "ignore": 8,
+        "verify_independently": 1,
+        "call_someone": 1
+      },
+      "confidence": {
+        "3": 2,
+        "5": 5,
+        "4": 3
+      },
+      "warn_others": {
+        "true": 9,
+        "false": 1
+      }
+    },
+    {
+      "stimulus_id": "S2_upi_collect",
+      "arm": "control",
+      "kind": "scam",
+      "responses": {
+        "ignore": 9,
+        "reply": 1
+      },
+      "confidence": {
+        "4": 4,
+        "5": 4,
+        "3": 2
+      },
+      "warn_others": {
+        "true": 8,
+        "false": 2
+      }
+    },
+    {
+      "stimulus_id": "S3_family_impersonation",
+      "arm": "control",
+      "kind": "scam",
+      "responses": {
+        "verify_independently": 8,
+        "call_someone": 2
+      },
+      "confidence": {
+        "4": 5,
+        "5": 3,
+        "3": 2
+      },
+      "warn_others": {
+        "true": 7,
+        "false": 3
+      }
+    },
+    {
+      "stimulus_id": "S4_lottery_prize",
+      "arm": "control",
+      "kind": "scam",
+      "responses": {
+        "ignore": 6,
+        "verify_independently": 4
+      },
+      "confidence": {
+        "4": 4,
+        "5": 5,
+        "3": 1
+      },
+      "warn_others": {
+        "true": 8,
+        "false": 2
+      }
+    },
+    {
+      "stimulus_id": "S5_bank_otp",
+      "arm": "control",
+      "kind": "legitimate",
+      "responses": {
+        "comply": 1,
+        "ignore": 8,
+        "verify_independently": 1
+      },
+      "confidence": {
+        "5": 6,
+        "4": 3,
+        "3": 1
+      },
+      "warn_others": {
+        "true": 0,
+        "false": 10
+      }
+    },
+    {
+      "stimulus_id": "S6_delivery_notification",
+      "arm": "control",
+      "kind": "legitimate",
+      "responses": {
+        "comply": 2,
+        "ignore": 7,
+        "verify_independently": 1
+      },
+      "confidence": {
+        "5": 9,
+        "3": 1
+      },
+      "warn_others": {
+        "true": 0,
+        "false": 10
+      }
+    },
+    {
+      "stimulus_id": "S1_digital_arrest",
+      "arm": "treatment",
+      "kind": "scam",
+      "responses": {
+        "ignore": 9,
+        "verify_independently": 1
+      },
+      "confidence": {
+        "5": 7,
+        "4": 3
+      },
+      "warn_others": {
+        "true": 9,
+        "false": 1
+      }
+    },
+    {
+      "stimulus_id": "S2_upi_collect",
+      "arm": "treatment",
+      "kind": "scam",
+      "responses": {
+        "ignore": 10
+      },
+      "confidence": {
+        "5": 6,
+        "4": 4
+      },
+      "warn_others": {
+        "true": 9,
+        "false": 1
+      }
+    },
+    {
+      "stimulus_id": "S3_family_impersonation",
+      "arm": "treatment",
+      "kind": "scam",
+      "responses": {
+        "call_someone": 2,
+        "verify_independently": 5,
+        "ignore": 2,
+        "reply": 1
+      },
+      "confidence": {
+        "5": 6,
+        "4": 4
+      },
+      "warn_others": {
+        "true": 9,
+        "false": 1
+      }
+    },
+    {
+      "stimulus_id": "S4_lottery_prize",
+      "arm": "treatment",
+      "kind": "scam",
+      "responses": {
+        "ignore": 7,
+        "verify_independently": 3
+      },
+      "confidence": {
+        "5": 7,
+        "4": 3
+      },
+      "warn_others": {
+        "true": 9,
+        "false": 1
+      }
+    },
+    {
+      "stimulus_id": "S5_bank_otp",
+      "arm": "treatment",
+      "kind": "legitimate",
+      "responses": {
+        "comply": 2,
+        "ignore": 8
+      },
+      "confidence": {
+        "5": 8,
+        "3": 1,
+        "4": 1
+      },
+      "warn_others": {
+        "true": 0,
+        "false": 10
+      }
+    },
+    {
+      "stimulus_id": "S6_delivery_notification",
+      "arm": "treatment",
+      "kind": "legitimate",
+      "responses": {
+        "comply": 2,
+        "ignore": 8
+      },
+      "confidence": {
+        "5": 9,
+        "4": 1
+      },
+      "warn_others": {
+        "true": 0,
+        "false": 10
+      }
+    }
+  ]
+}

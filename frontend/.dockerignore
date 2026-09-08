@@ -1,0 +1,6 @@
+# Applies to the `context: ./frontend` build in docker-compose.yml.
+# node_modules especially: copying it in would both bloat the context and
+# risk shadowing the platform-correct deps `npm ci` installs in the image.
+node_modules/
+dist/
+.vite/

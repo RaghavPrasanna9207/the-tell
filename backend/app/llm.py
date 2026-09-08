@@ -16,18 +16,31 @@ from typing import TypeVar
 import ollama
 from pydantic import BaseModel, ValidationError
 
-TEACHER_MODEL = "qwen2.5:7b-instruct-q4_K_M"
+from app import config
+
+TEACHER_MODEL = config.TEACHER_MODEL
 
 T = TypeVar("T", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaUnavailableError(RuntimeError):
-    """Raised when the local Ollama server can't be reached, or the pulled
-    model isn't present. Callers should surface this as a clear 503, not
-    fall back to fabricated output — see CLAUDE.md: fully local, no fallback
-    to a cloud API, ever."""
+class LLMUnavailableError(RuntimeError):
+    """Raised when the configured teacher backend can't be reached or isn't
+    usable. Callers should surface this as a clear 503 rather than falling
+    back to fabricated output: a scam-explanation tool that invents an
+    explanation when its model is down is worse than one that says it's
+    down."""
+
+
+class OllamaUnavailableError(LLMUnavailableError):
+    """The Ollama-specific case. Kept as its own name because call sites and
+    tests reference it directly; catch LLMUnavailableError to cover both
+    backends."""
+
+
+class NIMUnavailableError(LLMUnavailableError):
+    """The NIM-specific case: no API key, auth rejected, or rate limited."""
 
 
 @dataclass
@@ -43,7 +56,9 @@ class GenerationResult:
 
 
 def _client() -> ollama.Client:
-    return ollama.Client()
+    # Host from config, not the library default: under Docker Compose the
+    # server is at http://ollama:11434, not localhost.
+    return ollama.Client(host=config.OLLAMA_HOST)
 
 
 def check_available(model: str = TEACHER_MODEL) -> None:

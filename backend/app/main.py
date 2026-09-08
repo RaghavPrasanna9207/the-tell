@@ -4,7 +4,7 @@ Layer 1 runs as a two-stage cascade rather than calling the teacher
 directly: the distilled ModernBERT student (app.student) screens every
 message first as a deliberately high-recall gate, and the (slow, ~5s)
 teacher is only woken up when the student finds something worth
-investigating. See CLAUDE.md and the plan's Phase A1 — this is what makes
+investigating. See docs/DESIGN_RULES.md and the plan's Phase A1 — this is what makes
 the distilled student a real part of the running system rather than a
 benchmark-only artifact. If the student model isn't present (e.g.
 eval/distill.py has never been run), the gate is skipped entirely and every
@@ -12,7 +12,7 @@ message goes straight to the teacher, so a fresh clone still works.
 
 If Ollama isn't running or the model isn't pulled, /analyze returns a 503
 with an actionable message — it never falls back to fabricated output or a
-cloud API. See CLAUDE.md.
+cloud API. See docs/DESIGN_RULES.md.
 """
 
 import logging
@@ -23,9 +23,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app import config
 from app.classify import classify
 from app.explain import explain_all
-from app.llm import OllamaUnavailableError
+from app.llm import LLMUnavailableError
 from app.student import is_available as student_available, should_investigate, warm_up
 from app.taxonomy import Technique
 
@@ -49,7 +50,7 @@ app = FastAPI(title="The Tell", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=config.CORS_ORIGINS,  # defaults to the Vite dev server
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,6 +67,7 @@ class TechniqueCard(BaseModel):
     confidence: float
     explanation: str
     source: str
+    source_url: str
 
 
 class AnalyzeResponse(BaseModel):
@@ -95,7 +97,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
             return AnalyzeResponse(is_clean=True, cards=[])
 
         explanations = explain_all(classify_result.analysis.detections)
-    except OllamaUnavailableError as exc:
+    except LLMUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     cards = [
@@ -106,6 +108,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
             confidence=result.detection.confidence,
             explanation=result.explanation,
             source=result.counter_move.source,
+            source_url=result.counter_move.source_url,
         )
         for result in explanations
     ]

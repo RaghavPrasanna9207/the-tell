@@ -1,7 +1,7 @@
 """Loader for the grounded fact table (`data/counter_moves.yaml`).
 
 Layer 2 never generates factual claims — it retrieves a `CounterMove` by
-technique id and phrases it around a verbatim span. See CLAUDE.md.
+technique id and phrases it around a verbatim span. See docs/DESIGN_RULES.md.
 """
 
 from functools import lru_cache
@@ -21,9 +21,13 @@ class CounterMove(BaseModel):
     why_it_works: str
     reality_check: str
     source: str
+    source_url: str
+    """A followable link to `source`. Surfaced all the way to the UI so a
+    reader can check the claim themselves — a citation nobody can follow is
+    not much better than no citation."""
     counter_action: str
 
-    @field_validator("plain_name", "why_it_works", "reality_check", "source", "counter_action")
+    @field_validator("plain_name", "why_it_works", "reality_check", "source", "source_url", "counter_action")
     @classmethod
     def not_blank(cls, v: str) -> str:
         if not v or not v.strip():

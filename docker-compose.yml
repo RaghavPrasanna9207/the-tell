@@ -1,0 +1,85 @@
+# Local development stack. Three services so a clone can go from nothing to a
+# working system without the multi-step manual setup the README used to
+# require (install Ollama, pull a 4.5GB model, make a venv, install CUDA torch
+# from a separate index, npm install).
+#
+# This runs the LOCAL teacher via Ollama. The public deployment runs the
+# hosted teacher instead — see deploy/ — because a 7B model on a free CPU host
+# is unusably slow.
+#
+#   docker compose up --build
+#   docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+#
+# The pull is a separate step on purpose: it's 4.5GB, it only needs doing
+# once, and baking it into an image or an entrypoint would mean re-downloading
+# it on every rebuild.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      # Named volume, so the 4.5GB of model weights survive `down` and
+      # rebuilds. Losing them to a routine teardown is a 10-minute re-pull.
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # GPU passthrough is deliberately NOT enabled by default. On Windows it
+    # needs WSL2 plus the nvidia-container-toolkit, which is exactly the kind
+    # of setup friction this compose file exists to remove. Uncomment if you
+    # have it and want the teacher to run at GPU speed:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_BACKEND: ollama
+      # Service name, not localhost — inside the network "localhost" is the
+      # backend container itself.
+      OLLAMA_HOST: http://ollama:11434
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      # No student weights in the image (backend/models/ is gitignored and is
+      # ~574MB). Point this at the published student to enable the cascade
+      # gate; with it unset the gate is skipped and every message goes to the
+      # teacher, which is the documented fresh-clone behavior.
+      STUDENT_HF_REPO: ${STUDENT_HF_REPO:-}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      # Generous: the student warm-up on CPU is slow, and the container is
+      # not ready until it finishes (see app/main.py's lifespan hook).
+      start_period: 180s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Reached from the user's browser, not from inside the network, so
+        # this is a host-visible URL.
+        VITE_API_BASE: http://localhost:8000
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  ollama-models:

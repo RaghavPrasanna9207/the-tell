@@ -13,7 +13,7 @@ verbatim-quote guarantee hold by construction, the same way the
 reality-check/counter-action text does, not by hoping a validator catches
 a drift.
 
-See CLAUDE.md: the model selects and phrases, it never invents.
+See docs/DESIGN_RULES.md: the model selects and phrases, it never invents.
 """
 
 from dataclasses import dataclass

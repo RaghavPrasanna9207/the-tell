@@ -9,20 +9,34 @@ the app is a red icon. This project's bet: the product isn't classification, it'
 counter-persuasion — naming the specific technique being used, grounded in
 verifiable facts, in language a person under pressure will actually believe.
 
-Fully local. No API key, no account, no cost — everything runs on-device via
-Ollama + a distilled local classifier.
+A 150M-parameter distilled classifier gates a much larger teacher model: roughly
+71% of messages are resolved by the small model alone and never reach the
+expensive one. The teacher backend is swappable (local Ollama, or a hosted
+endpoint for the public demo) behind one interface — see `app/config.py`.
 
 ![Demo: pasting a digital-arrest scam message and getting back named-technique explanation cards](docs/demo.gif)
 
 **Status:** taxonomy, both layers, gold labeling, distillation, three-way eval,
-inter-annotator kappa, the student cascade (below), the human study (N=20,
-results below), and end-to-end UI verification are all complete. No live
-public deploy: the actual product is the teacher's named-technique
-explanations, and that model can't run acceptably on a free CPU host, so a
-public demo would necessarily show a degraded, gate-only slice of it. The
-GIF above is the real thing, full strength, recorded against the live local
-stack — see "Running" below to run it yourself. See `CLAUDE.md` for project
-rules and the full plan at `~/.claude/plans/1-a-scam-shield-temporal-muffin.md`.
+inter-annotator kappa, the student cascade, the human study (N=20), and
+end-to-end UI verification are complete. See `docs/DESIGN_RULES.md` for the
+design rules this codebase holds to.
+
+> **In flight (2026-09-08).** Three things are mid-change and this README has
+> not caught up yet:
+> 1. **The Eval A latency and macro-F1 figures below are under re-measurement
+>    and should not be quoted.** A fresh run of the same script path against
+>    the same 250 gold messages produced teacher macro-F1 0.56 (vs 0.51 below)
+>    and 523ms/msg (vs 4966ms below). The F1 gap is consistent with the
+>    documented instability on 3-support techniques; the 9.5x latency gap is
+>    not, and is being re-measured before either number is republished. This
+>    project has already been burned once by a GPU-clock measurement artifact
+>    (see the 355x correction below), so nothing gets published until it
+>    reproduces.
+> 2. **Eval B's H2 is withdrawn as uninterpretable** — not a null result, a
+>    broken instrument. See `study/PREREGISTRATION.md`'s 2026-09-08 amendment
+>    and the Eval B section below, which has been corrected.
+> 3. A public deployment and a Docker-based setup are being added; the
+>    "Setup" section below still describes the manual path.
 
 ## Architecture
 
@@ -285,12 +299,44 @@ two explicit "what would change our mind" outcomes named in the
 pre-registration, and it's reported as exactly that rather than reframed
 after the fact.
 
-**No H2 harm signal.** The point estimate trends in the reassuring
-direction — treatment participants were if anything slightly *less*
-distrustful of the two legitimate messages than control, not more — and the
-CI comfortably straddles zero. The concern that a named-technique explanation
-might train people to over-distrust real messages didn't show up in this
-sample.
+**H2 is withdrawn as uninterpretable — the instrument was broken.** An earlier
+version of this README reported "no H2 harm signal" and read the numbers as
+reassurance. That was wrong, and it was the worst kind of wrong: an affirmative
+safety claim drawn from a measurement that could not have detected the harm it
+claimed to rule out. A post-hoc audit found two defects, both in the design
+rather than the data:
+
+1. **The two arms saw the same screen on the only two stimuli H2 uses.** S5
+   (bank OTP) and S6 (delivery notification) both classified clean, so control
+   got `[No warning was flagged for this message.]` and treatment got
+   `No manipulation techniques detected.` — the same content, differently
+   worded. There was no explanation to show, because the system correctly found
+   nothing. The only remaining mechanism is carryover from the four
+   explanations seen earlier, which is a far weaker test than pre-registered
+   and was never stated as the mechanism.
+2. **`ignore` was coded as "distrust."** On a scam message that coding is
+   sound; on a legitimate informational message it is not — ignoring a delivery
+   notification is the correct, ordinary response, not a false alarm. Of the
+   responses counted as "distrustful" on the legitimate stimuli, **15 of 17
+   (control) and 16 of 16 (treatment) are literally `ignore`.** The 0.85 / 0.80
+   figures measure "did you decline to act on an informational SMS." An 85%
+   distrust rate for a routine HDFC OTP is implausible on its face, which is
+   the tell.
+
+The numbers are still printed by `analyze_study.py` — deleting them would hide
+the error rather than report it — but under an explicit UNINTERPRETABLE header
+carrying both defects and the ignore-share diagnostic, so they cannot travel
+without the caveat. Full write-up in `study/PREREGISTRATION.md`'s 2026-09-08
+amendment, logged through that document's own amendment mechanism rather than
+edited into its body.
+
+**The corrected instrument is built but deliberately unrun.** What H2 needed is
+a direct judgment — *"Do you think this message is genuine?"* — rather than one
+inferred from a chosen action, since on a legitimate message answering "no" is
+a false alarm regardless of what the participant would do. It is wired through
+the CLI, the spreadsheet export/import, and the analysis. Re-running with 20 new
+participants is out of scope, and back-filling the existing 20 is impossible by
+design: participant ids are random and unlinked to identity.
 
 Per-stimulus counts (descriptive only — the pre-registration is explicit that
 the six stimuli are not six separate experiments, so this is for
@@ -311,10 +357,16 @@ thread for anyone extending this study: the messages closest to genuinely
 fooling someone are also the ones where this N had the least room to show an
 effect either way.
 
-**Read this alongside Eval A, not instead of it.** The classifier eval above
-is the resume artifact — an accurate, fast, honestly-measured detection
-pipeline. This study asked a harder, adjacent question: does naming the
-technique, on top of that pipeline, change what a person says they'd do? At
-N=20 the honest answer is "no detectable effect, and no detected harm" — a
-well-designed null is a better interview story than a shaky significant one
-obtained by underpowering the caveats instead of the sample.
+**What this study actually establishes.** One null result on the primary
+outcome (H1), from a ceiling effect at N=20 — and one hypothesis (H2) that
+turned out to be unmeasurable with the instrument that was pre-registered for
+it. That is a thinner result than the earlier write-up claimed, and the honest
+summary is: this study asked whether naming the technique changes stated
+behavior, and it did not answer that question. It could not have answered the
+false-alarm half of it at all.
+
+Keeping it in the repo rather than deleting it is deliberate. The
+pre-registration, the fixed analysis plan committed before any participant ran,
+the block randomization, and the refusal to reframe a null after the fact are
+all real. So is finding the defect afterwards, in your own instrument, and
+saying so in the document that specified it.
