@@ -47,13 +47,74 @@ and the `IN-*` eval messages share an author, so in-domain performance here is
 measured on the distribution the model was taught. The UCI misses are the ones
 that look like genuine out-of-distribution failure.
 
+**Except most of them are not clean failures at all.** Six of the nine fall
+inside the 80-message kappa subset, so a second annotator independently labeled
+them. On **all six** the second annotator disagreed with the primary, and on
+**five of six** they said the message contained *no technique*:
+
+| id | primary | second annotator |
+|---|---|---|
+| `uci-03010` | `channel_switch` | *(none)* |
+| `uci-04754` | `reciprocity_hook` | *(none)* |
+| `uci-04086` | `reciprocity_hook` | *(none)* |
+| `uci-02119` | `manufactured_urgency`, `reciprocity_hook` | *(none)* |
+| `uci-00056` | `manufactured_urgency`, `reciprocity_hook` | *(none)* |
+| `uci-04841` | `manufactured_urgency`, `channel_switch`, `reciprocity_hook` | `manufactured_urgency` |
+
+Every one is the `reciprocity_hook` / prize-claim definitional split documented
+in the 2026-08-23 kappa section below — the single technique where agreement
+collapsed to kappa = -0.02.
+
+So the gate's headline correctness cost is measured against labels a second
+human would largely not have assigned. On these messages the gate is siding
+with annotator 2. **"9 of 69 silenced" is an upper bound on the gate's error,
+not an estimate of it** — the true figure depends on a taxonomy question the
+two annotators answered differently, and this is the clearest demonstration in
+the project of why the kappa exercise was worth doing: without it, these nine
+would read as nine clean model failures.
+
 Caveat on the absolute numbers: this run's teacher scored macro-F1 0.56, where
-the table further down this file records 0.51 from an earlier pass. That gap is
-consistent with the fold-to-fold instability already documented below —
-`sunk_cost_pressure` (support 3) scored a perfect 1.00 in this run, and one
-flip on a 3-support class moves the macro average ~0.03. **The cascade delta of
-0.01 is robust to this**, because both rows come from the same teacher pass.
-The absolute figures are under re-measurement; the delta is not.
+the table further down this file records 0.51 from an earlier pass. **A clean
+re-run on 2026-09-09 also returned 0.56**, so 0.51 is the outlier and the
+figure has been corrected in the README. Baseline (0.41) and student (0.48)
+reproduced exactly across all runs. The teacher's instability is consistent
+with the fold-to-fold behavior documented below — `sunk_cost_pressure`
+(support 3) scored a perfect 1.00 in one run, and one flip on a 3-support class
+moves the macro average ~0.03.
+
+**The cascade delta of 0.01 is robust to all of this**, because both rows come
+from the same teacher pass — which is the reason for the one-pass-scored-twice
+design rather than two separate passes.
+
+## 2026-09-09: latency on this hardware is not a publishable number
+
+Three runs of the same 250-message pass, same script path, same model:
+
+| Run | Teacher | Student / gate |
+|---|---|---|
+| 2026-08-18 | 4966 ms/msg | 65-175 ms/msg |
+| 2026-09-08 (`cascade_eval.py`, gate ran first) | 523 ms/msg | 315 ms/msg |
+| 2026-09-09 (`compare.py`, clean) | 2794 ms/msg | 216 ms/msg |
+
+The teacher spans 9.5x. Whether Ollama already had the 4.5GB model resident and
+what clock state the GPU was in plausibly dominate the signal. Note also that
+the student's *fastest* number (216ms) comes from the run where it executed
+right after a 20-minute teacher pass — the exact condition behind the
+discredited 14ms artifact documented above — while its slowest (315ms) comes
+from the run where it went first on an idle GPU. The bias has a consistent
+direction, which is what makes it a systematic measurement problem rather than
+noise.
+
+All latency point estimates have therefore been removed from the README's
+results table. Publishing the flattering end of a 9.5x range is exactly the
+error this file already documents once. What survives and doesn't depend on
+wall-clock: the student is ~30x smaller in parameters, and the gate eliminates
+71% of teacher calls — the figure that matters against a rate-limited hosted
+teacher, where the cost is request budget.
+
+A real latency claim would need fixed clocks (`nvidia-smi -lgc`), a warmed
+resident model, and several interleaved runs. That's worth doing before any
+latency number goes back in.
 
 ## 2026-08-23: Cohen's kappa on the 80-message subset (Phase A4)
 
@@ -371,6 +432,15 @@ impersonated (an institution vs. someone specific to the reader).
 
 ## What this means
 
+> **Superseded in two places by the 2026-09-09 re-runs at the top of this
+> file.** The teacher's held-out macro-F1 is **0.56**, not the 0.51 quoted
+> below, so the student trails by 0.08 rather than 0.03. And every latency
+> figure and speed multiple below should be read as unsupported: the same
+> measurement spans a 9.5x range across runs on this hardware. The
+> support-driven split described below does still hold. The text is left as
+> written rather than silently rewritten, because the point of this file is
+> the record of what was believed when.
+
 - **The distillation thesis holds up under a clean, leakage-free, held-out
   eval — as a latency/size trade, not a free accuracy win.** The 574MB /
   ~65-175ms student trails the 4.5GB / 4966ms teacher by 0.03 macro-F1 (0.48
@@ -452,7 +522,7 @@ messages clamped 2 out-of-range confidences and had **0 messages error out**
 worth of teacher recall on every eval run.
 
 This is the more consequential finding of the two evals: the classifier
-being mid (held-out macro-F1 0.41-0.51 across baseline/student/teacher) is
+being mid (held-out macro-F1 0.41-0.56 across baseline/student/teacher) is
 a defensible, pre-registered-as-expected outcome given corpus size. Layer 2
 silently degrading to boilerplate on
 100% of the study's treatment-arm content would have invalidated the

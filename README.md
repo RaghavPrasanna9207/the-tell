@@ -21,22 +21,19 @@ inter-annotator kappa, the student cascade, the human study (N=20), and
 end-to-end UI verification are complete. See `docs/DESIGN_RULES.md` for the
 design rules this codebase holds to.
 
-> **In flight (2026-09-08).** Three things are mid-change and this README has
-> not caught up yet:
-> 1. **The Eval A latency and macro-F1 figures below are under re-measurement
->    and should not be quoted.** A fresh run of the same script path against
->    the same 250 gold messages produced teacher macro-F1 0.56 (vs 0.51 below)
->    and 523ms/msg (vs 4966ms below). The F1 gap is consistent with the
->    documented instability on 3-support techniques; the 9.5x latency gap is
->    not, and is being re-measured before either number is republished. This
->    project has already been burned once by a GPU-clock measurement artifact
->    (see the 355x correction below), so nothing gets published until it
->    reproduces.
-> 2. **Eval B's H2 is withdrawn as uninterpretable** — not a null result, a
->    broken instrument. See `study/PREREGISTRATION.md`'s 2026-09-08 amendment
->    and the Eval B section below, which has been corrected.
-> 3. A public deployment and a Docker-based setup are being added; the
->    "Setup" section below still describes the manual path.
+> **Recently corrected (2026-09-09).** Two results in this README were wrong
+> and have been fixed in place:
+> 1. **Eval B's H2 is withdrawn as uninterpretable** — not a null result, a
+>    broken instrument. It previously read as evidence of no harm. See
+>    `study/PREREGISTRATION.md`'s 2026-09-08 amendment and the Eval B section.
+> 2. **The teacher's macro-F1 was 0.51 here; it is 0.56**, confirmed by two
+>    independent re-runs. Baseline (0.41) and student (0.48) reproduced
+>    exactly. **All latency figures have been removed from the results table**
+>    — the same measurement spans a 9.5x range across runs on this hardware,
+>    which makes any single number unpublishable. See the latency note below.
+>
+> A public deployment is in progress; `deploy/` has the setup and the Docker
+> path is documented under Setup, but neither has been run end to end yet.
 
 ## What to look at
 
@@ -59,6 +56,12 @@ If you're skimming, these four are the substance:
 - **A pre-registered hypothesis was withdrawn** — not as a null result, but as
   a measurement that could not have detected what it claimed to rule out. See
   Eval B below, and `study/PREREGISTRATION.md`.
+- **The shipped cascade is measured, and its headline failure isn't one** —
+  the student gate silences 9 of 69 scam messages, which sounds bad until you
+  check them against the second annotator: on all six that were double-labeled,
+  they disagreed with the primary, and on five they said there was no technique
+  at all. The gate is siding with annotator 2. `eval/cascade_eval.py` and
+  `ERROR_ANALYSIS.md`.
 
 The classifier itself is mid, and says so: held-out macro-F1 in the 0.41–0.56
 range across baseline, student and teacher. The measurement discipline is the
@@ -253,8 +256,9 @@ analysis in `backend/eval/ERROR_ANALYSIS.md`.
 | System | Macro-F1 | Macro-P | Macro-R | Latency/msg | Size |
 |---|---|---|---|---|---|
 | Baseline (TF-IDF + LR) | 0.41 | 0.33 | 0.55 | ~0ms (CPU) | negligible |
-| Teacher (Qwen2.5-7B, live) | **0.51** | **0.75** | 0.43 | 4966ms | ~4.5GB |
-| Student (distilled ModernBERT) | 0.48 | 0.42 | **0.60** | **~65-175ms** | **574MB / 150M params** |
+| Teacher (Qwen2.5-7B, live) | **0.56** | **0.79** | 0.48 | see below | ~4.5GB |
+| Student (distilled ModernBERT) | 0.48 | 0.42 | **0.60** | see below | **574MB / 150M params** |
+| Deployed cascade (gate → teacher) | 0.55 | 0.81 | 0.46 | see below | — |
 
 Run via `eval/compare.py`, same 250 gold messages for all three, thresholds
 calibrated held-out. **The Macro-F1 and Latency columns are under
@@ -287,24 +291,74 @@ measurements of the same 250-message pass, in a fresh process, land in the
 **65-175ms/msg range** (confirmed via `nvidia-smi`: this laptop's RTX 4060 idles
 at 1890MHz against a 3105MHz boost ceiling, and single bursty inference calls —
 one message at a time, exactly how a live product is actually used — don't hold
-it there). That's still a genuine 28-76x latency win over the teacher's
-4966ms/msg, just not the inflated 355x the anomalous measurement implied. Not
-rounding up a good number is the whole point of this project's honesty
-standard, so this gets corrected in the open rather than quietly kept.
+it there). Not rounding up a good number is the whole point of this project's
+honesty standard, so this gets corrected in the open rather than quietly kept.
 
-**Read this as a latency/size trade, not a free accuracy win.** An earlier,
+**2026-09-09: latency on this hardware is not reproducible enough to publish a
+number at all, and that is the finding.** Three independent runs of the same
+250-message pass, same script path, same model:
+
+| Run | Teacher | Student / gate |
+|---|---|---|
+| 2026-08-18 | 4966 ms/msg | 65-175 ms/msg |
+| 2026-09-08 (`cascade_eval.py`, gate first) | 523 ms/msg | 315 ms/msg |
+| 2026-09-09 (`compare.py`, clean) | 2794 ms/msg | 216 ms/msg |
+
+The teacher spans a 9.5x range across runs. Whether Ollama already had the
+4.5GB model resident, and what clock state the GPU was in, plausibly dominate
+the measurement — and note the student's *fastest* figure (216ms) comes from
+the run where it executed immediately after a 20-minute teacher pass, the exact
+condition that produced the discredited 14ms artifact above, while its slowest
+(315ms) comes from the run where it went first on an idle GPU. The bias has a
+consistent direction.
+
+**So no latency point estimate appears in the table above.** A single
+laptop-GPU number that moves by 9.5x between runs is not a measurement, and
+publishing the flattering end of that range is precisely the mistake this
+section already documents once. What survives is what doesn't depend on
+wall-clock: the student is **~30x smaller** (150M vs 7B params, 574MB vs
+4.5GB), and the gate removes **71% of teacher calls entirely** — which is the
+number that actually matters against a rate-limited hosted teacher, where the
+cost is request budget rather than milliseconds.
+
+**Accuracy, by contrast, reproduces.** Baseline (0.41) and student (0.48)
+held-out macro-F1 came back identical across runs. The teacher came back
+**0.56** in two independent runs, not the 0.51 previously reported here; the
+table above now says 0.56. The likely cause is the fold-to-fold instability
+already documented in `ERROR_ANALYSIS.md` — one flip on a 3-support technique
+moves the macro average ~0.03 — which is itself the argument for reading the
+per-technique rows rather than the macro line.
+
+**Read this as a size/throughput trade, not a free accuracy win.** An earlier,
 in-sample-thresholded version of this table had the student slightly *ahead* of
 the teacher (0.56 vs 0.52) — that ranking didn't survive fixing the threshold
 methodology to be genuinely held-out. With honest calibration the teacher is
-back in front, 0.51 vs 0.48. The gap has a clean, legible cause: on the 4
-highest-support techniques (`manufactured_urgency`, `false_authority`,
-`reciprocity_hook`, `fear_of_consequence` — support 24-36) the student clearly
-*beats* the teacher; the teacher's edge is concentrated in the 7 techniques with
-single-digit-to-low-double-digit support (as low as 3), where the student had too
-few positive training examples to generalize. That's a genuinely better resume
-story than the original number — distillation buys a large, real latency win and
-~8x smaller footprint for a small, well-understood accuracy cost, not a gap
-that's hidden or hand-waved. Full per-technique breakdown in `ERROR_ANALYSIS.md`.
+back in front, 0.56 vs 0.48.
+
+The gap has a legible, support-driven cause. Per-technique, held-out
+(2026-09-09 run):
+
+| | student wins | teacher wins |
+|---|---|---|
+| 4 highest-support techniques (24-36) | 3 | 1 |
+| 7 lower-support techniques (3-12) | 1 | 6 |
+
+Where the student had enough positive training examples it is competitive or
+better — `fear_of_consequence` 0.88 vs 0.50, `false_authority` 0.77 vs 0.42,
+`reciprocity_hook` 0.68 vs 0.55. Where it didn't, it falls apart:
+`payment_irreversibility` 0.00, `channel_switch` 0.12. The teacher's single
+loss among the low-support techniques is `trust_transfer`, where it scores a
+flat 0.00 — see below.
+
+Two corrections to an earlier version of this paragraph, from re-running the
+eval: `manufactured_urgency` is not a student win, it's a tie within noise
+(0.59 vs 0.60), so the claim is 3 of the top 4 rather than all 4. And the
+"large, real latency win" this paragraph used to assert is not a claim this
+hardware can support — see the latency note above. The defensible version of
+the trade is ~30x smaller and 71% of teacher calls eliminated, for 0.08
+macro-F1.
+
+Full per-technique breakdown in `ERROR_ANALYSIS.md`.
 
 **The distillation quality gap, and what actually fixed it.** The first real
 distillation run scored macro-F1 = **0.10**, with zero recall on 8 of 11
