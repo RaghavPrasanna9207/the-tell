@@ -54,6 +54,15 @@ NIM_BASE_URL = _env("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NIM_MODEL = _env("NIM_MODEL", "meta/llama-3.3-70b-instruct")
 NIM_API_KEY = _env("NIM_API_KEY", "")
 
+NIM_STRUCTURED_MODE = _env("NIM_STRUCTURED_MODE", "guided_json").lower()
+"""How structured output is enforced on the NIM path: "guided_json" (NVIDIA's
+nvext extension, schema-enforced during decoding) or "json_object" (valid JSON
+only, NOT schema-constrained). Default is guided_json; the fallback exists
+because whether the hosted endpoint honors it is measured, not assumed — run
+scripts/verify_nim.py. Running in json_object mode breaks app/llm.py's
+"malformed output is impossible" guarantee, and that has to be stated rather
+than quietly tolerated."""
+
 # --- student gate ----------------------------------------------------------
 STUDENT_MODEL_DIR = Path(_env("STUDENT_MODEL_DIR", str(_BACKEND_DIR / "models" / "student")))
 STUDENT_HF_REPO = _env("STUDENT_HF_REPO", "")

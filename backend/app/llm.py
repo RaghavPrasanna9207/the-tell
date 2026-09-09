@@ -108,39 +108,101 @@ def _clamp_range_violations(raw: dict, errors: list[dict]) -> list[str] | None:
     return clamped
 
 
+def _nim_generate(messages: list[dict], schema: type[T], model: str) -> str:
+    """One NIM chat completion, constrained to `schema`. Returns raw content.
+
+    NVIDIA's documented mechanism is `nvext.guided_json`, which takes the JSON
+    schema as-is and enforces it during decoding via xgrammar — the same
+    guarantee Ollama's `format` gives. `NIM_STRUCTURED_MODE=json_object` falls
+    back to plain JSON mode, which constrains the output to *valid JSON* but
+    not to this schema; that path exists because whether the hosted endpoint
+    honors guided_json is something to measure, not assume (see
+    scripts/verify_nim.py). If it ever runs in json_object mode, the
+    "malformed output is impossible" claim at the top of this module does not
+    hold and the README must say so.
+    """
+    import httpx
+
+    if not config.NIM_API_KEY:
+        raise NIMUnavailableError(
+            "NIM_API_KEY is not set. Get a free key at https://build.nvidia.com, "
+            "or set LLM_BACKEND=ollama to use a local model instead."
+        )
+
+    body: dict = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.1,
+        "max_tokens": 1024,
+    }
+    if config.NIM_STRUCTURED_MODE == "json_object":
+        body["response_format"] = {"type": "json_object"}
+    else:
+        body["nvext"] = {"guided_json": schema.model_json_schema()}
+
+    try:
+        response = httpx.post(
+            f"{config.NIM_BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {config.NIM_API_KEY}"},
+            json=body,
+            timeout=120.0,
+        )
+    except httpx.RequestError as exc:
+        raise NIMUnavailableError(f"Could not reach NIM at {config.NIM_BASE_URL}: {exc}") from exc
+
+    if response.status_code in (401, 403):
+        raise NIMUnavailableError("NIM rejected the API key (401/403). Check NIM_API_KEY.")
+    if response.status_code == 429:
+        # The free tier is ~40 req/min, and one /analyze is 1 classify call
+        # plus one explain call per detected technique — so a burst of pastes
+        # can genuinely hit this.
+        raise NIMUnavailableError("NIM rate limit reached (429). Wait a moment and try again.")
+    if response.status_code != 200:
+        raise NIMUnavailableError(f"NIM returned HTTP {response.status_code}: {response.text[:200]}")
+
+    return response.json()["choices"][0]["message"]["content"]
+
+
 def generate_structured(
     prompt: str,
     schema: type[T],
     *,
     system: str | None = None,
-    model: str = TEACHER_MODEL,
+    model: str | None = None,
 ) -> tuple[T, GenerationResult]:
     """Generate output constrained to `schema`'s JSON schema, then validate
-    it into an instance of `schema`. Raises OllamaUnavailableError if the
-    server/model isn't available. A ge/le range violation (see
+    it into an instance of `schema`. Raises LLMUnavailableError if the
+    configured backend isn't usable. A ge/le range violation (see
     `_clamp_range_violations`) is clamped and logged rather than raised;
     any other pydantic.ValidationError means the model (very unusually,
     given constrained decoding) produced something structurally unexpected
     — that's rare enough to be worth investigating, not silently retried.
-    """
-    check_available(model)
 
-    client = _client()
+    Which backend answers is `LLM_BACKEND`. Callers don't know or care:
+    classify() and explain() are the only two, and neither changed when NIM
+    was added.
+    """
+    model = model or config.active_teacher_model()
+
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     start = time.monotonic()
-    response = client.chat(
-        model=model,
-        messages=messages,
-        format=schema.model_json_schema(),
-        options={"temperature": 0.1},
-    )
+    if config.LLM_BACKEND == "nim":
+        content = _nim_generate(messages, schema, model)
+    else:
+        check_available(model)
+        response = _client().chat(
+            model=model,
+            messages=messages,
+            format=schema.model_json_schema(),
+            options={"temperature": 0.1},
+        )
+        content = response["message"]["content"]
     elapsed = time.monotonic() - start
 
-    content = response["message"]["content"]
     clamped_fields: list[str] = []
     try:
         parsed = schema.model_validate_json(content)

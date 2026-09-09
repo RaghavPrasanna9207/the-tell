@@ -1,32 +1,39 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Single-page React + TypeScript + Vite client for The Tell. One screen: paste a
+message, get back named-technique cards with the manipulated span highlighted
+in place and a followable citation per card.
 
-Currently, two official plugins are available:
+Intentionally thin — one component, hand-written CSS, no design system, no
+router, no state management library. See `docs/DESIGN_RULES.md`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # http://localhost:5173, expects the API on :8000
+npm run build    # tsc -b && vite build  (the typecheck runs here, not separately)
+npm run lint     # oxlint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Configuration
+
+`VITE_API_BASE` sets the API origin at build time.
+
+- Unset → `http://localhost:8000` (local development against `uvicorn`).
+- Empty string → same-origin, which is what the deployed build uses: FastAPI
+  serves this bundle, so there's no cross-origin hop and no CORS to configure.
+
+## Two things worth knowing before editing
+
+**Never render "safe."** When the API returns `is_clean: true` the copy is "No
+manipulation techniques detected" plus an explicit line that this does not mean
+the message is safe. The classifier misses real scams — see
+`backend/eval/cascade_eval.py` for the measured miss rate — so "we found
+nothing" and "there is nothing" are different statements and the UI must not
+collapse them.
+
+**The highlight is a substring match, not a model output.** `highlightSpan()`
+does `text.indexOf(span)` and renders `<mark>`. It can do that safely because
+the backend drops any span that isn't a verbatim substring of the input
+(`backend/app/classify.py`), so a hallucinated quote never reaches this
+component. If that check ever moves, this breaks silently — it would just fail
+to highlight rather than error.

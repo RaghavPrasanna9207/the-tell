@@ -35,7 +35,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 
-from app.llm import TEACHER_MODEL, check_available
+from app import config
+from app.llm import check_available
 from app.student import GATE_THRESHOLD, STUDENT_MODEL_DIR, should_investigate
 from eval.baseline import load_gold_as_arrays
 from eval.compare import teacher_predict
@@ -52,20 +53,20 @@ def load_or_run_teacher(texts: list[str], technique_names: list[str], refresh: b
     key = str(len(texts)) + "|" + (texts[0][:50] if texts else "")
     if CACHE_PATH.exists() and not refresh:
         cached = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
-        if cached.get("key") == key and cached.get("model") == TEACHER_MODEL:
+        if cached.get("key") == key and cached.get("model") == config.active_teacher_model():
             print(f"Using cached teacher pass ({CACHE_PATH}). --refresh to re-run.")
             return np.array(cached["y_proba"]), cached["avg_latency"], cached["n_errors"]
         print("Cache exists but doesn't match the current gold set/model — re-running.")
 
     check_available()
-    print(f"Running teacher ({TEACHER_MODEL}) over {len(texts)} messages. This is the slow part.")
+    print(f"Running teacher ({config.active_teacher_model()}) over {len(texts)} messages. This is the slow part.")
     y_proba, avg_latency, n_errors = teacher_predict(texts, technique_names)
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     CACHE_PATH.write_text(
         json.dumps(
             {
                 "key": key,
-                "model": TEACHER_MODEL,
+                "model": config.active_teacher_model(),
                 "y_proba": y_proba.tolist(),
                 "avg_latency": avg_latency,
                 "n_errors": n_errors,
