@@ -5,6 +5,56 @@ every message individually reviewed by a single primary annotator; see the
 2026-08-23 update below for Cohen's kappa against a second annotator on an
 80-message subset).
 
+## 2026-09-08: what the cascade gate actually costs, end to end
+
+Every number in this file below this section scores a *component*. The product
+is the cascade: `app/main.py` runs the student gate first, and a message the
+gate rejects returns "no manipulation techniques detected" with the teacher
+never called. That composition had never been measured — `compare.py` scores
+the teacher as if it ran on everything, and `gate_calibration.py` scores the
+gate alone at the message level ("does anything fire"). `eval/cascade_eval.py`
+closes the gap.
+
+Method: one teacher pass over all 250 gold messages, scored twice — once
+whole, once with gate-rejected rows zeroed out. The teacher isn't
+deterministic call to call, so two separate passes would confound the gate's
+cost with sampling noise; one pass scored twice means the only difference
+between the two rows is the gate.
+
+| | macro-P | macro-R | macro-F1 |
+|---|---|---|---|
+| Teacher alone | 0.81 | 0.47 | 0.56 |
+| **Deployed cascade** | 0.81 | 0.46 | **0.55** |
+
+**The gate costs 0.01 macro-F1.** Only `reciprocity_hook` moved (0.55 → 0.51);
+every other technique is identical. For a component that removes 71% of teacher
+calls, that is a good trade — and a much better one than the "student loses to
+teacher on rare techniques" risk predicted.
+
+**The correctness cost, which is the number that matters for a "never say
+safe" product: 9 of 69 scam messages are silenced by the gate.** For those,
+Layer 2 never runs. All nine:
+
+`uci-03010`, `uci-04841`, `uci-04754`, `uci-04086`, `uci-02119`, `uci-00056`,
+`uci-00833`, `uci-03864`, `uci-02941`
+
+**Every one is a UCI message. Not a single `IN-*` message is silenced.** The
+gate fails on 2000s UK SMS spam — ringtone offers, prize-claim lines, "call
+09xxx" — and holds on the India-specific digital-arrest and UPI scripts the
+product is actually for. That is the favorable version of this result, but it
+is favorable partly by construction: the student's India-specific training data
+and the `IN-*` eval messages share an author, so in-domain performance here is
+measured on the distribution the model was taught. The UCI misses are the ones
+that look like genuine out-of-distribution failure.
+
+Caveat on the absolute numbers: this run's teacher scored macro-F1 0.56, where
+the table further down this file records 0.51 from an earlier pass. That gap is
+consistent with the fold-to-fold instability already documented below —
+`sunk_cost_pressure` (support 3) scored a perfect 1.00 in this run, and one
+flip on a 3-support class moves the macro average ~0.03. **The cascade delta of
+0.01 is robust to this**, because both rows come from the same teacher pass.
+The absolute figures are under re-measurement; the delta is not.
+
 ## 2026-08-23: Cohen's kappa on the 80-message subset (Phase A4)
 
 A second annotator labeled the same 80-message kappa subset via the Excel

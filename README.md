@@ -38,17 +38,45 @@ design rules this codebase holds to.
 > 3. A public deployment and a Docker-based setup are being added; the
 >    "Setup" section below still describes the manual path.
 
+## What to look at
+
+This README is long because it records what went wrong as well as what works.
+If you're skimming, these four are the substance:
+
+- **The Layer 2 validator was silently 0%** — every explanation the human study
+  showed its treatment arm was fallback boilerplate, not model output. The fix
+  was architectural, not a better prompt: stop asking the model to quote the
+  span and insert it programmatically, so the guarantee holds by construction.
+  See "Layer 2 validator pass rate" below, and `app/explain.py`.
+- **Held-out thresholds reversed the headline result** — per-technique
+  thresholds were originally tuned and scored on the same 250 messages. Fixing
+  that to 5-fold held-out calibration moved the student from *ahead* of the
+  teacher to behind it, and the worse number is the one reported.
+  `eval/metrics.py`.
+- **The eval leaked, and the leak was found here** — the student had trained on
+  190 of the 250 gold messages, so 76% of its "generalization" score was
+  memorization. Retrained clean. `eval/distill.py`.
+- **A pre-registered hypothesis was withdrawn** — not as a null result, but as
+  a measurement that could not have detected what it claimed to rule out. See
+  Eval B below, and `study/PREREGISTRATION.md`.
+
+The classifier itself is mid, and says so: held-out macro-F1 in the 0.41–0.56
+range across baseline, student and teacher. The measurement discipline is the
+point, not the score.
+
 ## Architecture
 
 ```
 paste text ──> GATE: distilled ModernBERT student (app/student.py)
-               high-recall pre-filter, ~65-175ms, no verbatim spans
+               high-recall pre-filter, runs locally, no verbatim spans
                               │
                nothing clears the gate? ──> "no techniques detected", teacher never called
-                              │ (something fired)
+                              │ (something fired — ~29% of messages)
                               ▼
                Layer 1: multi-label technique classifier
-               (Ollama/Qwen2.5-7B, schema-constrained)
+               schema-constrained decoding; teacher is swappable —
+               local Ollama/Qwen2.5-7B or hosted NIM/Llama-3.3-70B
+               (app/config.py: LLM_BACKEND)
                               │
                techniques[] + verbatim spans + confidence
                               ▼
@@ -72,6 +100,31 @@ been run), the gate is skipped and every message goes straight to the
 teacher — same behavior as before this cascade existed.
 
 ## Setup
+
+### With Docker (fewer steps)
+
+```bash
+docker compose up --build
+docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+# UI on http://localhost:3000, API on http://localhost:8000
+```
+
+The model pull is a separate step because it's 4.5GB and only needs doing once;
+baking it into the image would re-download it on every rebuild. It's kept in a
+named volume so `docker compose down` doesn't cost you a re-pull.
+
+Two caveats. The cascade gate needs the distilled student, which isn't in the
+image (`backend/models/` is gitignored, ~574MB) — set `STUDENT_HF_REPO` to
+enable it, or run without it and every message goes to the teacher. And the
+teacher runs on CPU here; the GPU passthrough stanza in `docker-compose.yml` is
+commented out because on Windows it needs WSL2 plus the nvidia-container-toolkit,
+which is the setup friction this path exists to avoid.
+
+**These compose files have not been run.** They were written on a machine
+without Docker installed. The YAML validates and the Dockerfiles are
+conventional, but treat the first `up --build` as unproven.
+
+### Manually
 
 ```bash
 # Backend — use a venv. This project's teacher/distillation deps
@@ -122,9 +175,12 @@ cd frontend && npm run dev
 ## Testing
 
 ```bash
-cd backend && pytest        # 87 tests: taxonomy/counter-move integrity,
-                             # classify/explain logic, metrics, cascade gate,
-                             # full /analyze pipeline (mocked at the LLM boundary)
+cd backend && pytest        # 109 tests: taxonomy/counter-move integrity and
+                             # source-citation checks, classify/explain logic,
+                             # metrics, the cascade gate, both teacher backends,
+                             # full /analyze (mocked at the LLM boundary)
+cd study   && pytest        # 24 tests: study analysis + spreadsheet round-trip
+
 python eval/run_eval.py     # baseline classifier metrics against the corpus
 ```
 
@@ -149,6 +205,10 @@ python backend/eval/compare.py
 
 # Measure the cascade gate's scam-recall / teacher-wake-rate trade-off
 python backend/eval/gate_calibration.py
+
+# Score the system that actually ships: student gate -> teacher, composed, so
+# the number describes the product rather than one of its components
+python backend/eval/cascade_eval.py
 
 # Get a second annotator (not a study participant — see below) to label the
 # 80-message kappa subset, either via CLI:
@@ -197,7 +257,26 @@ analysis in `backend/eval/ERROR_ANALYSIS.md`.
 | Student (distilled ModernBERT) | 0.48 | 0.42 | **0.60** | **~65-175ms** | **574MB / 150M params** |
 
 Run via `eval/compare.py`, same 250 gold messages for all three, thresholds
-calibrated held-out.
+calibrated held-out. **The Macro-F1 and Latency columns are under
+re-measurement — see the note at the top of this README before quoting them.**
+
+**What this gold set is, and therefore what these numbers mean.** 190 of the
+250 messages are UCI SMS spam — 2000s-era UK text-message spam, a different
+language and a different era from the Indian digital-arrest and UPI scams this
+project targets. Of the 69 messages carrying at least one technique, 45 were
+written by the same person who designed the taxonomy and assigned the labels.
+Labels are single-annotator, with macro-average Cohen's kappa 0.68 against a
+second annotator on an 80-message subset.
+
+So these scores measure the taxonomy against its author's own distribution
+more than against live scam traffic. The obvious suspicion — that the
+hand-written training messages are near-duplicates of the hand-written eval
+messages — was checked and does not hold: TF-IDF cosine similarity between
+each `IN-*` gold message and its nearest training neighbour is mean 0.13,
+median 0.10, with exactly one pair above 0.5. It's shared authorship and
+shared vocabulary, not leakage. But a genuinely independent test set,
+collected from real reported scams and labeled by someone else, is the single
+thing that would most improve the credibility of every number on this page.
 
 **A latency honesty note, because an earlier number here was wrong.** An
 earlier measurement reported student latency as low as 14ms/msg — that turned
