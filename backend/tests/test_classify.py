@@ -54,6 +54,24 @@ def test_hallucinated_span_is_dropped_not_trusted():
     assert result.dropped_spans == ["CBI officer speaking"]
 
 
+def test_span_with_padding_whitespace_is_trimmed_and_kept():
+    """Real miss: Qwen quoted the last sentence of a message with a trailing
+    space the message doesn't have, and the exact check dropped a correct
+    detection. Trimming must not let an empty span through."""
+    message = "Only 12 seats left in the premium batch at the introductory price."
+    fake_analysis = Analysis(
+        detections=[
+            Detection(technique=Technique.FAKE_SCARCITY, span=" Only 12 seats left \n", confidence=0.9),
+            Detection(technique=Technique.MANUFACTURED_URGENCY, span="   ", confidence=0.5),
+        ]
+    )
+    with patch("app.classify.generate_structured", return_value=(fake_analysis, _fake_generation())):
+        result = classify(message)
+
+    assert [d.span for d in result.analysis.detections] == ["Only 12 seats left"]
+    assert result.dropped_spans == ["   "]
+
+
 def test_clean_message_produces_no_detections():
     message = "Your OTP is 483920. Valid for 10 minutes."
     with patch("app.classify.generate_structured", return_value=(Analysis(), _fake_generation())):

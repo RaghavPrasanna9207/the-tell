@@ -56,8 +56,12 @@ def classify(message: str) -> ClassifyResult:
     kept = []
     dropped = []
     for detection in analysis.detections:
-        if detection.span in message:
-            kept.append(detection)
+        # Models often pad a quote with a trailing space or newline; trimming
+        # that keeps the check verbatim. An empty span is in every string, so
+        # it proves nothing and is dropped.
+        span = detection.span.strip()
+        if span and span in message:
+            kept.append(detection.model_copy(update={"span": span}))
         else:
             dropped.append(detection.span)
 
