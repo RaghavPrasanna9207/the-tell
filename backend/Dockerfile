@@ -24,8 +24,7 @@ COPY app/ ./app/
 COPY data/ ./data/
 
 # Defaults suit compose; every one is overridable (see app/config.py).
-ENV LLM_BACKEND=ollama \
-    OLLAMA_HOST=http://ollama:11434 \
+ENV OLLAMA_HOST=http://ollama:11434 \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8000

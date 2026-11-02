@@ -77,8 +77,7 @@ quietly keeping a good number whose basis has failed.
 A 150M-parameter distilled student gates a much larger teacher. Roughly 71%
 of messages resolve on the student-only path and never reach the teacher at
 all. That's the point of the design: the expensive model is woken only when
-something warrants it, which is what makes the system viable against a
-rate-limited hosted endpoint as well as on a laptop.
+something warrants it.
 
 The student has no notion of verbatim spans, so it can never answer on its
 own — Layer 2's span-grounding guarantee only ever comes from the teacher.
@@ -99,11 +98,8 @@ teacher's own score describes a component, not the shipped product.
 
 - Backend: Python 3.12, FastAPI, Pydantic, `sklearn`, HuggingFace
   `transformers`/`Trainer`.
-- Teacher: swappable via `LLM_BACKEND` (`app/config.py`). Local Ollama with
-  `qwen2.5:7b-instruct-q4_K_M` is the default and the backend every eval
-  number in the README was measured against; NVIDIA NIM serves the public
-  deployment, where a 7B model on a free CPU host would be unusably slow.
-  Both use JSON-schema-constrained decoding.
+- Teacher: local Ollama with `qwen2.5:7b-instruct-q4_K_M`, JSON-schema-constrained
+  decoding.
 - Student: `answerdotai/ModernBERT-base`, distilled from teacher labels.
 - Frontend: React + Vite + TypeScript, single page.
 

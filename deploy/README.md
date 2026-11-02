@@ -1,11 +1,8 @@
 # Deploying to Hugging Face Spaces
 
-The public demo runs the **full cascade** — the distilled student gates on the
-Space's CPU, and only messages that clear the gate reach the hosted teacher.
-That was the sticking point that kept this project undeployed: the product is
-the teacher's named-technique explanations, and a 7B model on a free CPU host
-would have meant shipping a degraded, gate-only slice of it. Moving the teacher
-to a hosted endpoint removes that constraint without weakening the demo.
+> **Unresolved: there is no teacher on the Space.** The student gate runs on
+> the Space's CPU, but the 7B teacher needs a GPU and Ollama isn't in the image.
+> Any message that clears the gate gets a 503. Decide that before deploying.
 
 Free tier: Docker SDK, 2 vCPU / 16GB RAM, no credit card. Sleeps after 48h idle.
 
@@ -19,20 +16,14 @@ huggingface-cli login
 python backend/eval/publish_student.py --repo <user>/the-tell-student-modernbert
 ```
 
-**2. Get a NIM API key** — https://build.nvidia.com, free, no credit card.
-
-**3. Create the Space** at https://huggingface.co/new-space with **Docker** as
+**2. Create the Space** at https://huggingface.co/new-space with **Docker** as
 the SDK (blank template), then in Settings → Variables and secrets:
 
 | Name | Kind | Value |
 |---|---|---|
-| `NIM_API_KEY` | **Secret** | `nvapi-...` |
 | `STUDENT_HF_REPO` | Variable | `<user>/the-tell-student-modernbert` |
 
-`NIM_API_KEY` must be a *secret*, not a variable — variables are visible to
-anyone who can view the Space.
-
-**4. Push.** The Space repo needs `Dockerfile` at its root and a `README.md`
+**3. Push.** The Space repo needs `Dockerfile` at its root and a `README.md`
 carrying the front matter below. Build context is the repo root, so both
 `backend/` and `frontend/` must be present.
 
@@ -86,10 +77,8 @@ It is not done until all of these hold:
    manipulated span highlighted and **clickable** source links.
 3. Pasting a benign message returns "No manipulation techniques detected" —
    and never the word "safe".
-4. The gate is genuinely running: a clean message resolves without a NIM call.
+4. The gate is genuinely running: a clean message resolves without a teacher call.
    Confirm in the Space logs via the `gate: clean, teacher skipped` line.
 5. Cold-start-from-sleep time is measured and written into the root README.
    The 20-30s warm-up figure recorded elsewhere was measured on an RTX 4060;
    two shared vCPUs will be slower and the real number belongs in the docs.
-6. `NIM_API_KEY` appears only in Space secrets — never in git, never in the
-   image, never in a build arg.

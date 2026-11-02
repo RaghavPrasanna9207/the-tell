@@ -77,9 +77,8 @@ paste text ──> GATE: distilled ModernBERT student (app/student.py)
                               │ (something fired — ~29% of messages)
                               ▼
                Layer 1: multi-label technique classifier
-               schema-constrained decoding; teacher is swappable —
-               local Ollama/Qwen2.5-7B or hosted NIM/Llama-3.3-70B
-               (app/config.py: LLM_BACKEND)
+               schema-constrained decoding; teacher is local
+               Ollama/Qwen2.5-7B
                               │
                techniques[] + verbatim spans + confidence
                               ▼
@@ -317,9 +316,7 @@ laptop-GPU number that moves by 9.5x between runs is not a measurement, and
 publishing the flattering end of that range is precisely the mistake this
 section already documents once. What survives is what doesn't depend on
 wall-clock: the student is **~30x smaller** (150M vs 7B params, 574MB vs
-4.5GB), and the gate removes **71% of teacher calls entirely** — which is the
-number that actually matters against a rate-limited hosted teacher, where the
-cost is request budget rather than milliseconds.
+4.5GB), and the gate removes **71% of teacher calls entirely**.
 
 **Accuracy, by contrast, reproduces.** Baseline (0.41) and student (0.48)
 held-out macro-F1 came back identical across runs. The teacher came back

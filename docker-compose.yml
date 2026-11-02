@@ -3,9 +3,7 @@
 # require (install Ollama, pull a 4.5GB model, make a venv, install CUDA torch
 # from a separate index, npm install).
 #
-# This runs the LOCAL teacher via Ollama. The public deployment runs the
-# hosted teacher instead — see deploy/ — because a 7B model on a free CPU host
-# is unusably slow.
+# This runs the teacher locally via Ollama.
 #
 #   docker compose up --build
 #   docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
@@ -47,7 +45,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      LLM_BACKEND: ollama
       # Service name, not localhost — inside the network "localhost" is the
       # backend container itself.
       OLLAMA_HOST: http://ollama:11434

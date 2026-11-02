@@ -109,8 +109,7 @@ All latency point estimates have therefore been removed from the README's
 results table. Publishing the flattering end of a 9.5x range is exactly the
 error this file already documents once. What survives and doesn't depend on
 wall-clock: the student is ~30x smaller in parameters, and the gate eliminates
-71% of teacher calls — the figure that matters against a rate-limited hosted
-teacher, where the cost is request budget.
+71% of teacher calls.
 
 A real latency claim would need fixed clocks (`nvidia-smi -lgc`), a warmed
 resident model, and several interleaved runs. That's worth doing before any

@@ -4,7 +4,7 @@ Until this file existed nothing in the project read an environment variable
 anywhere — every host, model name, path and threshold was a module-level
 constant. That was fine while the only deployment target was "this laptop",
 and it stops being fine the moment the same image has to run against a
-container-networked Ollama, or against a hosted endpoint with a secret.
+container-networked Ollama.
 
 Every default here reproduces the previous hardcoded constant exactly, so a
 checkout with no environment set behaves identically to before.
@@ -38,30 +38,9 @@ def _env_float(name: str, default: float) -> float:
         raise ValueError(f"{name} must be a number, got {raw!r}") from exc
 
 
-# --- which teacher backend answers Layer 1 and Layer 2 ---------------------
-# "ollama" = local Ollama server (the default, and what the eval numbers in
-# the README were measured against). "nim" = NVIDIA NIM's hosted endpoint,
-# which is what the public deployment uses because a 7B model on a free CPU
-# host would be unusably slow.
-LLM_BACKEND = _env("LLM_BACKEND", "ollama").lower()
-
-# --- ollama ----------------------------------------------------------------
+# --- ollama (the teacher for Layer 1 and Layer 2) ---------------------------
 OLLAMA_HOST = _env("OLLAMA_HOST", "http://localhost:11434")
 TEACHER_MODEL = _env("TEACHER_MODEL", "qwen2.5:7b-instruct-q4_K_M")
-
-# --- nim -------------------------------------------------------------------
-NIM_BASE_URL = _env("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
-NIM_MODEL = _env("NIM_MODEL", "meta/llama-3.3-70b-instruct")
-NIM_API_KEY = _env("NIM_API_KEY", "")
-
-NIM_STRUCTURED_MODE = _env("NIM_STRUCTURED_MODE", "guided_json").lower()
-"""How structured output is enforced on the NIM path: "guided_json" (NVIDIA's
-nvext extension, schema-enforced during decoding) or "json_object" (valid JSON
-only, NOT schema-constrained). Default is guided_json; the fallback exists
-because whether the hosted endpoint honors it is measured, not assumed — run
-scripts/verify_nim.py. Running in json_object mode breaks app/llm.py's
-"malformed output is impossible" guarantee, and that has to be stated rather
-than quietly tolerated."""
 
 # --- student gate ----------------------------------------------------------
 STUDENT_MODEL_DIR = Path(_env("STUDENT_MODEL_DIR", str(_BACKEND_DIR / "models" / "student")))
@@ -80,9 +59,3 @@ STATIC_DIR = Path(_env("STATIC_DIR", str(_BACKEND_DIR / "static")))
 """Built frontend to serve from the same origin as the API. Only mounted if
 it exists, so local development (Vite on :5173, API on :8000) is unaffected."""
 
-
-def active_teacher_model() -> str:
-    """The model name whichever backend is selected will actually call.
-    Reported in evals and logs so a number is never ambiguous about which
-    teacher produced it."""
-    return NIM_MODEL if LLM_BACKEND == "nim" else TEACHER_MODEL

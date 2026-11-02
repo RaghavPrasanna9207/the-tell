@@ -5,15 +5,13 @@ directly: the distilled ModernBERT student (app.student) screens every
 message first as a deliberately high-recall gate, and the teacher is only
 woken when the student finds something worth investigating. This is what
 makes the distilled student a real part of the running system rather than a
-benchmark-only artifact, and it's what makes a rate-limited hosted teacher
-viable — most messages never cost a request. eval/cascade_eval.py measures
+benchmark-only artifact — most messages never wake the 7B teacher. eval/cascade_eval.py measures
 what the gate costs in accuracy. If the student model isn't available (a
 fresh clone that has never run eval/distill.py, with no STUDENT_HF_REPO
 configured), the gate is skipped and every message goes straight to the
 teacher.
 
-Which teacher answers is app.config.LLM_BACKEND — local Ollama or hosted
-NIM. If it isn't reachable or usable, /analyze returns a 503 with an
+The teacher is local Ollama. If it isn't reachable or usable, /analyze returns a 503 with an
 actionable message; it never falls back to fabricated output. An
 explanation invented because the model was down would be worse than no
 explanation. See docs/DESIGN_RULES.md.

@@ -21,9 +21,8 @@ pydantic>=2.9
 # Grounded fact table
 pyyaml>=6.0
 
-# Teacher backends
-ollama>=0.4          # LLM_BACKEND=ollama
-httpx>=0.27          # LLM_BACKEND=nim
+# Teacher (local Ollama)
+ollama>=0.4
 
 # Student gate (torch installed separately, see above)
 transformers>=4.51
