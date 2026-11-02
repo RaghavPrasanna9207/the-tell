@@ -143,7 +143,7 @@ def _write_instructions(ws, *, batch: bool, n: int = 1) -> None:
 
 def _write_responses_sheet(ws, arm: str, cache: dict) -> None:
     ws.append([RESPONSE_BANNER])
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
     banner_cell = ws.cell(row=1, column=1)
     banner_cell.font = Font(italic=True)
     banner_cell.alignment = Alignment(wrap_text=True, vertical="top")
@@ -156,6 +156,11 @@ def _write_responses_sheet(ws, arm: str, cache: dict) -> None:
         "your_response",
         "confidence_1_to_5",
         "would_warn_others",
+        # Corrected H2 measure - see PREREGISTRATION.md amendment 2026-09-08.
+        # A direct judgment of the message, which the action question cannot
+        # give us: on a legitimate message "ignore" means "nothing to do",
+        # not "I don't believe this".
+        "is_message_genuine",
     ]
     ws.append(headers)
     for col, _ in enumerate(headers, start=1):
@@ -167,7 +172,7 @@ def _write_responses_sheet(ws, arm: str, cache: dict) -> None:
     for i, stimulus in enumerate(STIMULI, start=1):
         entry = cache[stimulus["id"]]
         system_shows = _render_control(entry) if arm == "control" else _render_treatment(entry)
-        ws.append([i, entry["text"], system_shows, "", "", ""])
+        ws.append([i, entry["text"], system_shows, "", "", "", ""])
 
     for row in ws.iter_rows(min_row=DATA_START_ROW, max_row=DATA_END_ROW):
         row[1].alignment = Alignment(wrap_text=True, vertical="top")
@@ -179,6 +184,7 @@ def _write_responses_sheet(ws, arm: str, cache: dict) -> None:
     ws.column_dimensions["D"].width = 16
     ws.column_dimensions["E"].width = 16
     ws.column_dimensions["F"].width = 16
+    ws.column_dimensions["G"].width = 18
     ws.freeze_panes = f"A{DATA_START_ROW}"
 
     response_dv = DataValidation(type="list", formula1=f'"{RESPONSE_LETTERS}"', allow_blank=True)
@@ -192,6 +198,14 @@ def _write_responses_sheet(ws, arm: str, cache: dict) -> None:
     warn_dv = DataValidation(type="list", formula1='"Y,N"', allow_blank=True)
     warn_dv.add(f"F{DATA_START_ROW}:F{DATA_END_ROW}")
     ws.add_data_validation(warn_dv)
+
+    # Separate DataValidation object rather than adding G to warn_dv's range:
+    # openpyxl serializes one <dataValidation> per object, and Excel silently
+    # drops the dropdown on a range it can't resolve cleanly. Same reason the
+    # sheet asks for single letters at all (see run_study.RESPONSE_LETTER_CODES).
+    genuine_dv = DataValidation(type="list", formula1='"Y,N"', allow_blank=True)
+    genuine_dv.add(f"G{DATA_START_ROW}:G{DATA_END_ROW}")
+    ws.add_data_validation(genuine_dv)
 
 
 def build_sheet(participant_id: str, arm: str, cache: dict) -> Workbook:

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE = "http://localhost:8000";
+// Empty string means same-origin, which is what the deployed build uses: the
+// API serves the built frontend, so there's no cross-origin hop and no CORS
+// to configure. Local `npm run dev` and the compose frontend both set this to
+// an absolute URL because the API is on a different port there.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 const TRUSTED_CONTACT_KEY = "the_tell_trusted_contact";
 
 interface TechniqueCard {
@@ -11,6 +15,7 @@ interface TechniqueCard {
   confidence: number;
   explanation: string;
   source: string;
+  source_url: string;
 }
 
 interface AnalyzeResponse {
@@ -128,7 +133,12 @@ export default function App() {
               <h3>{card.plain_name}</h3>
               <p className="quoted">"{highlightSpan(text, card.span)}"</p>
               <p>{card.explanation}</p>
-              <p className="source">Source: {card.source}</p>
+              <p className="source">
+                Source:{" "}
+                <a href={card.source_url} target="_blank" rel="noopener noreferrer">
+                  {card.source}
+                </a>
+              </p>
             </div>
           ))}
         </div>

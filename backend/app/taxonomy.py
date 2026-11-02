@@ -130,7 +130,7 @@ class Analysis(BaseModel):
 
     An empty `detections` list means no technique was found — this is
     "no manipulation techniques detected," never "this message is safe."
-    See CLAUDE.md.
+    See docs/DESIGN_RULES.md.
     """
 
     detections: list[Detection] = Field(default_factory=list)

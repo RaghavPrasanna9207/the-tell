@@ -1,0 +1,45 @@
+# Applies to builds whose context is the repo root — i.e. the deployment
+# image (deploy/Dockerfile.space), which needs both backend/ and frontend/.
+# The compose services build from ./backend and ./frontend and read their own
+# .dockerignore files instead; a .dockerignore is always read from the build
+# context root, so these do not cascade.
+
+.git/
+.gitignore
+
+# Virtualenvs and caches — several GB, wrong-platform binaries.
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+backend/eval/.cache/
+
+# Trained checkpoints (~574MB). Pulled from the Hugging Face Hub at build
+# time instead — see deploy/Dockerfile.space.
+backend/models/
+
+# Participant data. Must never reach an image, per PREREGISTRATION.md's
+# data-handling section.
+study/data/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Training/eval only — not needed to answer a request.
+docs/
+study/
+backend/tests/
+backend/eval/
+backend/scripts/
+backend/data/corpus/
+backend/requirements.txt
+
+# Local tooling and anything secret-shaped.
+.claude/
+.vscode/
+.idea/
+.env
+.env.*
+*.key

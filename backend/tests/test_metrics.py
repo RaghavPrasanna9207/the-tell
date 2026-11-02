@@ -80,7 +80,7 @@ def test_macro_average_is_plain_mean_across_techniques():
 
 def test_cost_weights_are_the_documented_values():
     """Pin the FN:FP weighting so a future refactor can't silently drift
-    from the "FN weighted 5-10x FP" decision in the plan/CLAUDE.md."""
+    from the "FN weighted 5-10x FP" decision in the plan/docs/DESIGN_RULES.md."""
     assert FN_WEIGHT >= 5
     assert FN_WEIGHT <= 10
     assert FP_WEIGHT == 1

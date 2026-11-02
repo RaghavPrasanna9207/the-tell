@@ -1,0 +1,77 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Deliberately NOT installing requirements.txt. That file is the
+      # dev/eval environment: it pulls accelerate, which pulls torch (~2.5GB
+      # on Linux), plus datasets, pandas and matplotlib. None of it is
+      # reachable from the test suite — no test loads model weights or calls
+      # a network, the student is mocked at `predict_proba_array` and the LLM
+      # at the client boundary, so torch and transformers are never imported.
+      # Installing them would turn a 30-second CI run into a several-minute
+      # one to exercise nothing.
+      #
+      # If a future test does import torch, this fails immediately with a
+      # plain ImportError, which is the right way to find out.
+      #
+      # pandas is here despite nothing importing it directly: scikit-learn
+      # imports it opportunistically when it's present, and importing
+      # eval.metrics does pull it in on a machine that has it. Installing it
+      # explicitly is cheaper than depending on which sklearn code paths are
+      # guarded.
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            "fastapi>=0.115" "pydantic>=2.9" "pyyaml>=6.0" "ollama>=0.4" \
+            "scikit-learn>=1.5" "pandas>=2.2" "openpyxl>=3.1" \
+            "httpx>=0.27" "pytest>=8.3"
+
+      # Two separate rootdirs, each with its own pytest.ini (pythonpath=.),
+      # so they cannot be run as one invocation from the repo root.
+      - name: Backend tests
+        working-directory: backend
+        run: pytest -q
+
+      - name: Study tests
+        working-directory: study
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      # `npm run build` is `tsc -b && vite build`, so this is the typecheck
+      # as well as the build.
+      - name: Typecheck and build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint

@@ -1,0 +1,25 @@
+# Applies to the `context: ./backend` build in docker-compose.yml.
+# A .dockerignore is read from the build context root, so the repo-root one
+# does NOT cover this build — hence a second file rather than one shared.
+
+# Several GB, and Windows binaries that wouldn't run in the image anyway.
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+eval/.cache/
+
+# Trained checkpoints (~574MB). The deployed student is pulled from the
+# Hugging Face Hub instead — see deploy/Dockerfile.space.
+models/
+
+# The corpus is for training and evaluation, not for answering requests.
+# counter_moves.yaml lives at data/counter_moves.yaml and is NOT excluded by
+# this — Layer 2 cannot run without it.
+data/corpus/
+
+# Not needed at runtime.
+tests/
+eval/
+scripts/
+requirements.txt

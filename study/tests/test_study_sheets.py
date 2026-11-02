@@ -18,10 +18,11 @@ DATA_START_ROW = export_study_sheet.DATA_START_ROW
 
 
 def _fill_ws(ws, responses, start_row=DATA_START_ROW):
-    for i, (letter, confidence, warn) in enumerate(responses, start=start_row):
+    for i, (letter, confidence, warn, genuine) in enumerate(responses, start=start_row):
         ws.cell(row=i, column=4, value=letter)
         ws.cell(row=i, column=5, value=confidence)
         ws.cell(row=i, column=6, value=warn)
+        ws.cell(row=i, column=7, value=genuine)  # corrected H2 measure
 
 
 def _fill_sheet(path, responses, sheet_name="Responses"):
@@ -34,7 +35,10 @@ def _fill_sheet(path, responses, sheet_name="Responses"):
 
 def _valid_responses():
     letters = list(RESPONSE_LETTER_CODES)  # C, R, I, V, S
-    return [(letters[i % 5], (i % 5) + 1, "Y" if i % 2 else "N") for i in range(len(STIMULI))]
+    return [
+        (letters[i % 5], (i % 5) + 1, "Y" if i % 2 else "N", "N" if i % 2 else "Y")
+        for i in range(len(STIMULI))
+    ]
 
 
 def test_export_does_not_leak_stimulus_id_kind_or_arm(tmp_path):
@@ -91,6 +95,43 @@ def test_control_arm_never_shows_technique_cards():
         assert row[2] in ("This looks like a scam.", "No warning was flagged for this message.")
 
 
+def test_sheet_exported_before_the_h2_amendment_still_imports(tmp_path, monkeypatch):
+    """A workbook exported before the corrected H2 measure existed has only 6
+    columns. row[6] would IndexError on it, which is an ugly crash instead of a
+    clean skip — so a short row is read as "old format, field not collected"
+    and imports with believes_genuine=None, the same way the 120 responses
+    collected before the amendment are treated by analyze_study.py."""
+    pending = tmp_path / "pending"
+    completed = tmp_path / "completed"
+    responses_path = tmp_path / "responses.jsonl"
+    monkeypatch.setattr(import_study_sheet, "PENDING_DIR", pending)
+    monkeypatch.setattr(import_study_sheet, "COMPLETED_DIR", completed)
+    monkeypatch.setattr(import_study_sheet, "RESPONSES_PATH", responses_path)
+
+    from openpyxl import Workbook
+
+    pending.mkdir(parents=True)
+    # Hand-build a 6-column sheet rather than exporting one — the current
+    # exporter writes 7 columns, so this is the only way to reproduce the
+    # pre-amendment format.
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Responses"
+    ws.append(["banner"])
+    ws.append(["message_number", "message", "system_shows", "your_response", "confidence_1_to_5", "would_warn_others"])
+    for letter, confidence, warn, _genuine in _valid_responses():
+        ws.append(["", "", "", letter, confidence, warn])
+    sheet_path = pending / "study_01df0117a7__control.xlsx"
+    wb.save(sheet_path)
+
+    import_study_sheet.main()
+
+    lines = [json.loads(line) for line in responses_path.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == len(STIMULI)
+    assert all(line["believes_genuine"] is None for line in lines)
+    assert all(line["response"] in set(RESPONSE_LETTER_CODES.values()) for line in lines)
+
+
 def test_round_trip_matches_run_study_schema(tmp_path, monkeypatch):
     pending = tmp_path / "pending"
     completed = tmp_path / "completed"
@@ -122,6 +163,7 @@ def test_round_trip_matches_run_study_schema(tmp_path, monkeypatch):
             "response",
             "confidence",
             "warn_others",
+            "believes_genuine",
             "timestamp",
         }
         assert line["participant_id"] == "abc123def456"
@@ -147,7 +189,7 @@ def test_incomplete_sheet_is_not_imported(tmp_path, monkeypatch):
     sheet_path = pending / "study_incomplete001__control.xlsx"
     wb.save(sheet_path)
     responses = _valid_responses()
-    responses[-1] = ("", "", "")  # last row left blank
+    responses[-1] = ("", "", "", "")  # last row left blank
     _fill_sheet(sheet_path, responses)
 
     import_study_sheet.main()

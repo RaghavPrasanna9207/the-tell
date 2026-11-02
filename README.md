@@ -9,32 +9,76 @@ the app is a red icon. This project's bet: the product isn't classification, it'
 counter-persuasion — naming the specific technique being used, grounded in
 verifiable facts, in language a person under pressure will actually believe.
 
-Fully local. No API key, no account, no cost — everything runs on-device via
-Ollama + a distilled local classifier.
+A 150M-parameter distilled classifier gates a much larger teacher model: roughly
+71% of messages are resolved by the small model alone and never reach the
+expensive one. The teacher backend is swappable (local Ollama, or a hosted
+endpoint for the public demo) behind one interface — see `app/config.py`.
 
 ![Demo: pasting a digital-arrest scam message and getting back named-technique explanation cards](docs/demo.gif)
 
 **Status:** taxonomy, both layers, gold labeling, distillation, three-way eval,
-inter-annotator kappa, the student cascade (below), the human study (N=20,
-results below), and end-to-end UI verification are all complete. No live
-public deploy: the actual product is the teacher's named-technique
-explanations, and that model can't run acceptably on a free CPU host, so a
-public demo would necessarily show a degraded, gate-only slice of it. The
-GIF above is the real thing, full strength, recorded against the live local
-stack — see "Running" below to run it yourself. See `CLAUDE.md` for project
-rules and the full plan at `~/.claude/plans/1-a-scam-shield-temporal-muffin.md`.
+inter-annotator kappa, the student cascade, the human study (N=20), and
+end-to-end UI verification are complete. See `docs/DESIGN_RULES.md` for the
+design rules this codebase holds to.
+
+> **Recently corrected (2026-09-09).** Two results in this README were wrong
+> and have been fixed in place:
+> 1. **Eval B's H2 is withdrawn as uninterpretable** — not a null result, a
+>    broken instrument. It previously read as evidence of no harm. See
+>    `study/PREREGISTRATION.md`'s 2026-09-08 amendment and the Eval B section.
+> 2. **The teacher's macro-F1 was 0.51 here; it is 0.56**, confirmed by two
+>    independent re-runs. Baseline (0.41) and student (0.48) reproduced
+>    exactly. **All latency figures have been removed from the results table**
+>    — the same measurement spans a 9.5x range across runs on this hardware,
+>    which makes any single number unpublishable. See the latency note below.
+>
+> A public deployment is in progress; `deploy/` has the setup and the Docker
+> path is documented under Setup, but neither has been run end to end yet.
+
+## What to look at
+
+This README is long because it records what went wrong as well as what works.
+If you're skimming, these four are the substance:
+
+- **The Layer 2 validator was silently 0%** — every explanation the human study
+  showed its treatment arm was fallback boilerplate, not model output. The fix
+  was architectural, not a better prompt: stop asking the model to quote the
+  span and insert it programmatically, so the guarantee holds by construction.
+  See "Layer 2 validator pass rate" below, and `app/explain.py`.
+- **Held-out thresholds reversed the headline result** — per-technique
+  thresholds were originally tuned and scored on the same 250 messages. Fixing
+  that to 5-fold held-out calibration moved the student from *ahead* of the
+  teacher to behind it, and the worse number is the one reported.
+  `eval/metrics.py`.
+- **The eval leaked, and the leak was found here** — the student had trained on
+  190 of the 250 gold messages, so 76% of its "generalization" score was
+  memorization. Retrained clean. `eval/distill.py`.
+- **A pre-registered hypothesis was withdrawn** — not as a null result, but as
+  a measurement that could not have detected what it claimed to rule out. See
+  Eval B below, and `study/PREREGISTRATION.md`.
+- **The shipped cascade is measured, and its headline failure isn't one** —
+  the student gate silences 9 of 69 scam messages, which sounds bad until you
+  check them against the second annotator: on all six that were double-labeled,
+  they disagreed with the primary, and on five they said there was no technique
+  at all. The gate is siding with annotator 2. `eval/cascade_eval.py` and
+  `ERROR_ANALYSIS.md`.
+
+The classifier itself is mid, and says so: held-out macro-F1 in the 0.41–0.56
+range across baseline, student and teacher. The measurement discipline is the
+point, not the score.
 
 ## Architecture
 
 ```
 paste text ──> GATE: distilled ModernBERT student (app/student.py)
-               high-recall pre-filter, ~65-175ms, no verbatim spans
+               high-recall pre-filter, runs locally, no verbatim spans
                               │
                nothing clears the gate? ──> "no techniques detected", teacher never called
-                              │ (something fired)
+                              │ (something fired — ~29% of messages)
                               ▼
                Layer 1: multi-label technique classifier
-               (Ollama/Qwen2.5-7B, schema-constrained)
+               schema-constrained decoding; teacher is local
+               Ollama/Qwen2.5-7B
                               │
                techniques[] + verbatim spans + confidence
                               ▼
@@ -58,6 +102,31 @@ been run), the gate is skipped and every message goes straight to the
 teacher — same behavior as before this cascade existed.
 
 ## Setup
+
+### With Docker (fewer steps)
+
+```bash
+docker compose up --build
+docker compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+# UI on http://localhost:3000, API on http://localhost:8000
+```
+
+The model pull is a separate step because it's 4.5GB and only needs doing once;
+baking it into the image would re-download it on every rebuild. It's kept in a
+named volume so `docker compose down` doesn't cost you a re-pull.
+
+Two caveats. The cascade gate needs the distilled student, which isn't in the
+image (`backend/models/` is gitignored, ~574MB) — set `STUDENT_HF_REPO` to
+enable it, or run without it and every message goes to the teacher. And the
+teacher runs on CPU here; the GPU passthrough stanza in `docker-compose.yml` is
+commented out because on Windows it needs WSL2 plus the nvidia-container-toolkit,
+which is the setup friction this path exists to avoid.
+
+**These compose files have not been run.** They were written on a machine
+without Docker installed. The YAML validates and the Dockerfiles are
+conventional, but treat the first `up --build` as unproven.
+
+### Manually
 
 ```bash
 # Backend — use a venv. This project's teacher/distillation deps
@@ -108,9 +177,12 @@ cd frontend && npm run dev
 ## Testing
 
 ```bash
-cd backend && pytest        # 87 tests: taxonomy/counter-move integrity,
-                             # classify/explain logic, metrics, cascade gate,
-                             # full /analyze pipeline (mocked at the LLM boundary)
+cd backend && pytest        # 109 tests: taxonomy/counter-move integrity and
+                             # source-citation checks, classify/explain logic,
+                             # metrics, the cascade gate, both teacher backends,
+                             # full /analyze (mocked at the LLM boundary)
+cd study   && pytest        # 24 tests: study analysis + spreadsheet round-trip
+
 python eval/run_eval.py     # baseline classifier metrics against the corpus
 ```
 
@@ -135,6 +207,10 @@ python backend/eval/compare.py
 
 # Measure the cascade gate's scam-recall / teacher-wake-rate trade-off
 python backend/eval/gate_calibration.py
+
+# Score the system that actually ships: student gate -> teacher, composed, so
+# the number describes the product rather than one of its components
+python backend/eval/cascade_eval.py
 
 # Get a second annotator (not a study participant — see below) to label the
 # 80-message kappa subset, either via CLI:
@@ -179,11 +255,31 @@ analysis in `backend/eval/ERROR_ANALYSIS.md`.
 | System | Macro-F1 | Macro-P | Macro-R | Latency/msg | Size |
 |---|---|---|---|---|---|
 | Baseline (TF-IDF + LR) | 0.41 | 0.33 | 0.55 | ~0ms (CPU) | negligible |
-| Teacher (Qwen2.5-7B, live) | **0.51** | **0.75** | 0.43 | 4966ms | ~4.5GB |
-| Student (distilled ModernBERT) | 0.48 | 0.42 | **0.60** | **~65-175ms** | **574MB / 150M params** |
+| Teacher (Qwen2.5-7B, live) | **0.56** | **0.79** | 0.48 | see below | ~4.5GB |
+| Student (distilled ModernBERT) | 0.48 | 0.42 | **0.60** | see below | **574MB / 150M params** |
+| Deployed cascade (gate → teacher) | 0.55 | 0.81 | 0.46 | see below | — |
 
 Run via `eval/compare.py`, same 250 gold messages for all three, thresholds
-calibrated held-out.
+calibrated held-out. **The Macro-F1 and Latency columns are under
+re-measurement — see the note at the top of this README before quoting them.**
+
+**What this gold set is, and therefore what these numbers mean.** 190 of the
+250 messages are UCI SMS spam — 2000s-era UK text-message spam, a different
+language and a different era from the Indian digital-arrest and UPI scams this
+project targets. Of the 69 messages carrying at least one technique, 45 were
+written by the same person who designed the taxonomy and assigned the labels.
+Labels are single-annotator, with macro-average Cohen's kappa 0.68 against a
+second annotator on an 80-message subset.
+
+So these scores measure the taxonomy against its author's own distribution
+more than against live scam traffic. The obvious suspicion — that the
+hand-written training messages are near-duplicates of the hand-written eval
+messages — was checked and does not hold: TF-IDF cosine similarity between
+each `IN-*` gold message and its nearest training neighbour is mean 0.13,
+median 0.10, with exactly one pair above 0.5. It's shared authorship and
+shared vocabulary, not leakage. But a genuinely independent test set,
+collected from real reported scams and labeled by someone else, is the single
+thing that would most improve the credibility of every number on this page.
 
 **A latency honesty note, because an earlier number here was wrong.** An
 earlier measurement reported student latency as low as 14ms/msg — that turned
@@ -194,24 +290,72 @@ measurements of the same 250-message pass, in a fresh process, land in the
 **65-175ms/msg range** (confirmed via `nvidia-smi`: this laptop's RTX 4060 idles
 at 1890MHz against a 3105MHz boost ceiling, and single bursty inference calls —
 one message at a time, exactly how a live product is actually used — don't hold
-it there). That's still a genuine 28-76x latency win over the teacher's
-4966ms/msg, just not the inflated 355x the anomalous measurement implied. Not
-rounding up a good number is the whole point of this project's honesty
-standard, so this gets corrected in the open rather than quietly kept.
+it there). Not rounding up a good number is the whole point of this project's
+honesty standard, so this gets corrected in the open rather than quietly kept.
 
-**Read this as a latency/size trade, not a free accuracy win.** An earlier,
+**2026-09-09: latency on this hardware is not reproducible enough to publish a
+number at all, and that is the finding.** Three independent runs of the same
+250-message pass, same script path, same model:
+
+| Run | Teacher | Student / gate |
+|---|---|---|
+| 2026-08-18 | 4966 ms/msg | 65-175 ms/msg |
+| 2026-09-08 (`cascade_eval.py`, gate first) | 523 ms/msg | 315 ms/msg |
+| 2026-09-09 (`compare.py`, clean) | 2794 ms/msg | 216 ms/msg |
+
+The teacher spans a 9.5x range across runs. Whether Ollama already had the
+4.5GB model resident, and what clock state the GPU was in, plausibly dominate
+the measurement — and note the student's *fastest* figure (216ms) comes from
+the run where it executed immediately after a 20-minute teacher pass, the exact
+condition that produced the discredited 14ms artifact above, while its slowest
+(315ms) comes from the run where it went first on an idle GPU. The bias has a
+consistent direction.
+
+**So no latency point estimate appears in the table above.** A single
+laptop-GPU number that moves by 9.5x between runs is not a measurement, and
+publishing the flattering end of that range is precisely the mistake this
+section already documents once. What survives is what doesn't depend on
+wall-clock: the student is **~30x smaller** (150M vs 7B params, 574MB vs
+4.5GB), and the gate removes **71% of teacher calls entirely**.
+
+**Accuracy, by contrast, reproduces.** Baseline (0.41) and student (0.48)
+held-out macro-F1 came back identical across runs. The teacher came back
+**0.56** in two independent runs, not the 0.51 previously reported here; the
+table above now says 0.56. The likely cause is the fold-to-fold instability
+already documented in `ERROR_ANALYSIS.md` — one flip on a 3-support technique
+moves the macro average ~0.03 — which is itself the argument for reading the
+per-technique rows rather than the macro line.
+
+**Read this as a size/throughput trade, not a free accuracy win.** An earlier,
 in-sample-thresholded version of this table had the student slightly *ahead* of
 the teacher (0.56 vs 0.52) — that ranking didn't survive fixing the threshold
 methodology to be genuinely held-out. With honest calibration the teacher is
-back in front, 0.51 vs 0.48. The gap has a clean, legible cause: on the 4
-highest-support techniques (`manufactured_urgency`, `false_authority`,
-`reciprocity_hook`, `fear_of_consequence` — support 24-36) the student clearly
-*beats* the teacher; the teacher's edge is concentrated in the 7 techniques with
-single-digit-to-low-double-digit support (as low as 3), where the student had too
-few positive training examples to generalize. That's a genuinely better resume
-story than the original number — distillation buys a large, real latency win and
-~8x smaller footprint for a small, well-understood accuracy cost, not a gap
-that's hidden or hand-waved. Full per-technique breakdown in `ERROR_ANALYSIS.md`.
+back in front, 0.56 vs 0.48.
+
+The gap has a legible, support-driven cause. Per-technique, held-out
+(2026-09-09 run):
+
+| | student wins | teacher wins |
+|---|---|---|
+| 4 highest-support techniques (24-36) | 3 | 1 |
+| 7 lower-support techniques (3-12) | 1 | 6 |
+
+Where the student had enough positive training examples it is competitive or
+better — `fear_of_consequence` 0.88 vs 0.50, `false_authority` 0.77 vs 0.42,
+`reciprocity_hook` 0.68 vs 0.55. Where it didn't, it falls apart:
+`payment_irreversibility` 0.00, `channel_switch` 0.12. The teacher's single
+loss among the low-support techniques is `trust_transfer`, where it scores a
+flat 0.00 — see below.
+
+Two corrections to an earlier version of this paragraph, from re-running the
+eval: `manufactured_urgency` is not a student win, it's a tie within noise
+(0.59 vs 0.60), so the claim is 3 of the top 4 rather than all 4. And the
+"large, real latency win" this paragraph used to assert is not a claim this
+hardware can support — see the latency note above. The defensible version of
+the trade is ~30x smaller and 71% of teacher calls eliminated, for 0.08
+macro-F1.
+
+Full per-technique breakdown in `ERROR_ANALYSIS.md`.
 
 **The distillation quality gap, and what actually fixed it.** The first real
 distillation run scored macro-F1 = **0.10**, with zero recall on 8 of 11
@@ -285,12 +429,44 @@ two explicit "what would change our mind" outcomes named in the
 pre-registration, and it's reported as exactly that rather than reframed
 after the fact.
 
-**No H2 harm signal.** The point estimate trends in the reassuring
-direction — treatment participants were if anything slightly *less*
-distrustful of the two legitimate messages than control, not more — and the
-CI comfortably straddles zero. The concern that a named-technique explanation
-might train people to over-distrust real messages didn't show up in this
-sample.
+**H2 is withdrawn as uninterpretable — the instrument was broken.** An earlier
+version of this README reported "no H2 harm signal" and read the numbers as
+reassurance. That was wrong, and it was the worst kind of wrong: an affirmative
+safety claim drawn from a measurement that could not have detected the harm it
+claimed to rule out. A post-hoc audit found two defects, both in the design
+rather than the data:
+
+1. **The two arms saw the same screen on the only two stimuli H2 uses.** S5
+   (bank OTP) and S6 (delivery notification) both classified clean, so control
+   got `[No warning was flagged for this message.]` and treatment got
+   `No manipulation techniques detected.` — the same content, differently
+   worded. There was no explanation to show, because the system correctly found
+   nothing. The only remaining mechanism is carryover from the four
+   explanations seen earlier, which is a far weaker test than pre-registered
+   and was never stated as the mechanism.
+2. **`ignore` was coded as "distrust."** On a scam message that coding is
+   sound; on a legitimate informational message it is not — ignoring a delivery
+   notification is the correct, ordinary response, not a false alarm. Of the
+   responses counted as "distrustful" on the legitimate stimuli, **15 of 17
+   (control) and 16 of 16 (treatment) are literally `ignore`.** The 0.85 / 0.80
+   figures measure "did you decline to act on an informational SMS." An 85%
+   distrust rate for a routine HDFC OTP is implausible on its face, which is
+   the tell.
+
+The numbers are still printed by `analyze_study.py` — deleting them would hide
+the error rather than report it — but under an explicit UNINTERPRETABLE header
+carrying both defects and the ignore-share diagnostic, so they cannot travel
+without the caveat. Full write-up in `study/PREREGISTRATION.md`'s 2026-09-08
+amendment, logged through that document's own amendment mechanism rather than
+edited into its body.
+
+**The corrected instrument is built but deliberately unrun.** What H2 needed is
+a direct judgment — *"Do you think this message is genuine?"* — rather than one
+inferred from a chosen action, since on a legitimate message answering "no" is
+a false alarm regardless of what the participant would do. It is wired through
+the CLI, the spreadsheet export/import, and the analysis. Re-running with 20 new
+participants is out of scope, and back-filling the existing 20 is impossible by
+design: participant ids are random and unlinked to identity.
 
 Per-stimulus counts (descriptive only — the pre-registration is explicit that
 the six stimuli are not six separate experiments, so this is for
@@ -311,10 +487,16 @@ thread for anyone extending this study: the messages closest to genuinely
 fooling someone are also the ones where this N had the least room to show an
 effect either way.
 
-**Read this alongside Eval A, not instead of it.** The classifier eval above
-is the resume artifact — an accurate, fast, honestly-measured detection
-pipeline. This study asked a harder, adjacent question: does naming the
-technique, on top of that pipeline, change what a person says they'd do? At
-N=20 the honest answer is "no detectable effect, and no detected harm" — a
-well-designed null is a better interview story than a shaky significant one
-obtained by underpowering the caveats instead of the sample.
+**What this study actually establishes.** One null result on the primary
+outcome (H1), from a ceiling effect at N=20 — and one hypothesis (H2) that
+turned out to be unmeasurable with the instrument that was pre-registered for
+it. That is a thinner result than the earlier write-up claimed, and the honest
+summary is: this study asked whether naming the technique changes stated
+behavior, and it did not answer that question. It could not have answered the
+false-alarm half of it at all.
+
+Keeping it in the repo rather than deleting it is deliberate. The
+pre-registration, the fixed analysis plan committed before any participant ran,
+the block randomization, and the refusal to reframe a null after the fact are
+all real. So is finding the defect afterwards, in your own instrument, and
+saying so in the document that specified it.

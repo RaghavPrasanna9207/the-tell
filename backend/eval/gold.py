@@ -1,13 +1,20 @@
 """Loader for the hand-labeled evaluation set.
 
-IMPORTANT — HONESTY NOTE (see CLAUDE.md "report metrics honestly"):
-The only labeled data that exists right now is `draft_labels` from
-`data/corpus/raw/handcrafted_india.jsonl` — technique ids assigned by the
-same person who wrote the messages, at authoring time. This is NOT the
-~250-message hand-labeled gold set with inter-annotator agreement that the
-plan calls for; it's a small pilot (N≈45 scam examples) that exists so the
-eval harness has something real to run against today. Every report this
-loader feeds into must say so, not present these numbers as final.
+Two loaders, and it matters which one a caller uses:
+
+`load_real_gold()` — the 250-message hand-labeled set
+(`data/corpus/gold/labels_primary.jsonl`). This is what every reported number
+should be scored against.
+
+`load_draft_gold()` — `draft_labels` from
+`data/corpus/raw/handcrafted_india.jsonl`, technique ids assigned by the same
+person who wrote the messages, at authoring time. A pilot, kept only as a
+smoke-test fixture. Anything reported from it carries DRAFT_GOLD_WARNING.
+
+HONESTY NOTE (see docs/DESIGN_RULES.md "report metrics honestly"): the real
+gold set is single-annotator, with macro-average Cohen's kappa 0.68 against a
+second annotator on an 80-message subset. Its composition limits what any
+score against it means — see GOLD_NOTE below.
 """
 
 import json
@@ -27,9 +34,13 @@ DRAFT_GOLD_WARNING = (
 
 GOLD_NOTE = (
     "REAL GOLD SET - N=250, every message individually reviewed (see "
-    "data/corpus/gold/labels_primary.jsonl). Still single-annotator: "
-    "inter-annotator agreement (Cohen's kappa) has not been computed yet "
-    "- see eval/label.py --annotator second --kappa-subset."
+    "data/corpus/gold/labels_primary.jsonl). Labels are single-annotator; a "
+    "second annotator independently labeled an 80-message subset, giving "
+    "macro-average Cohen's kappa = 0.68 (eval/kappa.py, ERROR_ANALYSIS.md). "
+    "Composition matters when reading any number scored against this set: "
+    "190 of 250 messages are UCI SMS spam and 45 of the 69 positive examples "
+    "are author-written, so this measures the taxonomy against its author's "
+    "own distribution more than against live Indian scam traffic."
 )
 
 

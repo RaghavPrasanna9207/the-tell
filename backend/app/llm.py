@@ -16,18 +16,26 @@ from typing import TypeVar
 import ollama
 from pydantic import BaseModel, ValidationError
 
-TEACHER_MODEL = "qwen2.5:7b-instruct-q4_K_M"
+from app import config
+
+TEACHER_MODEL = config.TEACHER_MODEL
 
 T = TypeVar("T", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaUnavailableError(RuntimeError):
-    """Raised when the local Ollama server can't be reached, or the pulled
-    model isn't present. Callers should surface this as a clear 503, not
-    fall back to fabricated output — see CLAUDE.md: fully local, no fallback
-    to a cloud API, ever."""
+class LLMUnavailableError(RuntimeError):
+    """Raised when the teacher can't be reached or isn't
+    usable. Callers should surface this as a clear 503 rather than falling
+    back to fabricated output: a scam-explanation tool that invents an
+    explanation when its model is down is worse than one that says it's
+    down."""
+
+
+class OllamaUnavailableError(LLMUnavailableError):
+    """The Ollama-specific case. Kept as its own name because call sites and
+    tests reference it directly."""
 
 
 @dataclass
@@ -43,7 +51,9 @@ class GenerationResult:
 
 
 def _client() -> ollama.Client:
-    return ollama.Client()
+    # Host from config, not the library default: under Docker Compose the
+    # server is at http://ollama:11434, not localhost.
+    return ollama.Client(host=config.OLLAMA_HOST)
 
 
 def check_available(model: str = TEACHER_MODEL) -> None:
@@ -98,34 +108,34 @@ def generate_structured(
     schema: type[T],
     *,
     system: str | None = None,
-    model: str = TEACHER_MODEL,
+    model: str | None = None,
 ) -> tuple[T, GenerationResult]:
     """Generate output constrained to `schema`'s JSON schema, then validate
-    it into an instance of `schema`. Raises OllamaUnavailableError if the
-    server/model isn't available. A ge/le range violation (see
+    it into an instance of `schema`. Raises LLMUnavailableError if the
+    teacher isn't usable. A ge/le range violation (see
     `_clamp_range_violations`) is clamped and logged rather than raised;
     any other pydantic.ValidationError means the model (very unusually,
     given constrained decoding) produced something structurally unexpected
     — that's rare enough to be worth investigating, not silently retried.
     """
-    check_available(model)
+    model = model or TEACHER_MODEL
 
-    client = _client()
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     start = time.monotonic()
-    response = client.chat(
+    check_available(model)
+    response = _client().chat(
         model=model,
         messages=messages,
         format=schema.model_json_schema(),
         options={"temperature": 0.1},
     )
+    content = response["message"]["content"]
     elapsed = time.monotonic() - start
 
-    content = response["message"]["content"]
     clamped_fields: list[str] = []
     try:
         parsed = schema.model_validate_json(content)

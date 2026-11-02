@@ -21,7 +21,10 @@ backend/models/
 *.gguf
 
 # Study data — participant responses, even scrubbed
-study/data/
+# (dir contents, not the dir itself - git won't descend into an excluded
+# directory, so the negation below only works against `study/data/*`)
+study/data/*
+!study/data/aggregate_counts.json
 study/*.csv
 
 # Node / frontend
@@ -39,3 +42,11 @@ frontend/.vite/
 Thumbs.db
 .vscode/
 .idea/
+
+# Eval caches (mechanically regenerable)
+backend/eval/.cache/
+
+# Local agent instructions - not part of the published project.
+# The durable engineering rules a reader needs live in
+# docs/DESIGN_RULES.md, which IS committed.
+CLAUDE.md

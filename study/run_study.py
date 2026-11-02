@@ -173,6 +173,12 @@ def main() -> None:
         choice = prompt_until_valid("> ", parse_choice)
         confidence = prompt_until_valid("How confident are you in that judgment? (1-5) > ", parse_confidence)
         warn_others = prompt_until_valid("Would you warn someone else about this message? (y/n) > ", parse_yes_no)
+        # Corrected H2 measure (PREREGISTRATION.md amendment 2026-09-08). Asked
+        # LAST, deliberately: the original three questions keep their exact
+        # order and wording so the 120 already-collected responses stay
+        # comparable, and asking "is this genuine?" earlier would prime the
+        # action choice that H1 depends on.
+        believes_genuine = prompt_until_valid("Do you think this message is genuine? (y/n) > ", parse_yes_no)
 
         append_response(
             RESPONSES_PATH,
@@ -184,6 +190,7 @@ def main() -> None:
                 "response": choice,
                 "confidence": confidence,
                 "warn_others": warn_others,
+                "believes_genuine": believes_genuine,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )

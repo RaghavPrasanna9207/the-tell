@@ -6,7 +6,7 @@ Sources:
     volume and benign/negative examples, not India-specific)
   - corpus/raw/handcrafted_india.jsonl  (hand-authored, grounded in the
     documented digital-arrest / UPI scam script — this is where the
-    taxonomy actually gets signal; see CLAUDE.md)
+    taxonomy actually gets signal; see docs/DESIGN_RULES.md)
 
 Output schema (one JSON object per line):
     id: str                    stable id, prefixed by source
@@ -14,7 +14,7 @@ Output schema (one JSON object per line):
     source: str                which raw file this came from
     ham_spam: str | null       "ham"/"spam" if the source provides it (UCI only)
     draft_labels: list[str] | null   author-intent technique ids, NOT gold —
-                                     see CLAUDE.md and the plan's hand-labeling
+                                     see docs/DESIGN_RULES.md and the plan's hand-labeling
                                      step for the actual annotation pass
 
 Run: python data/build_corpus.py

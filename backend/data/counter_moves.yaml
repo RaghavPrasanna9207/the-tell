@@ -2,7 +2,7 @@
 #
 # Every factual claim the app makes about a manipulation technique lives
 # here, hand-authored and source-cited. The LLM in Layer 2 SELECTS and
-# PHRASES an entry — it never generates a new factual claim. See CLAUDE.md.
+# PHRASES an entry — it never generates a new factual claim. See docs/DESIGN_RULES.md.
 #
 # Schema per entry (validated by backend/tests/test_taxonomy_integrity.py):
 #   id:             must match a Technique enum value in app/taxonomy.py
@@ -10,7 +10,19 @@
 #   why_it_works:   the psychological mechanism, one sentence
 #   reality_check:  a falsifiable factual claim that undercuts the scam
 #   source:         non-empty citation for the reality_check
+#   source_url:     a followable link to that source, on an authoritative
+#                   domain (see test_taxonomy_integrity.py's allowlist)
 #   counter_action: one concrete, disengage-and-verify next step
+#
+# On source_url, honestly: these are institution- and advisory-level links,
+# verified to resolve. They are NOT deep links to a specific PDF paragraph,
+# and their content has not been machine-verified against each reality_check,
+# because these government sites block automated fetching (pib.gov.in returns
+# 403 to non-browser clients; rbi.org.in serves a CAPTCHA). Confirming that a
+# given page still supports a given claim is a human job, and re-checking
+# them is worth doing whenever this table is edited. What the URL adds over
+# the prose `source` alone is that a reader can now go look — which is the
+# point, since the whole product rests on these facts being checkable.
 
 - id: manufactured_urgency
   plain_name: "A fake deadline"
@@ -20,6 +32,7 @@
     within a few hours. Real legal and financial processes always allow time
     for you to verify, consult a lawyer, or call the institution directly.
   source: "I4C (Indian Cyber Crime Coordination Centre) public advisory on digital arrest scams"
+  source_url: "https://cybercrime.gov.in/Webform/Crime_AwarenessDetail.aspx"
   counter_action: "Take the time anyway. A real deadline can survive you calling to verify it first."
 
 - id: false_authority
@@ -31,6 +44,7 @@
     Real police, CBI, ED, or customs officers do not conduct investigations
     over WhatsApp or Skype video calls.
   source: "I4C advisory on digital arrest scams; Government of India press releases on the Supreme Court-ordered CBI probe into digital arrest fraud"
+  source_url: "https://i4c.mha.gov.in/press-release.aspx"
   counter_action: "Hang up. Call your local police station directly using a number you look up yourself — never one they give you."
 
 - id: isolation
@@ -41,6 +55,7 @@
     secrecy from your own family. "Sub-judice" does not mean you are
     forbidden from telling your spouse or child that someone called you.
   source: "1930 National Cyber Crime Helpline public guidance"
+  source_url: "https://cybercrime.gov.in/"
   counter_action: "Tell someone right now — a family member, a friend, anyone. That single act is often enough to break the scam."
 
 - id: fear_of_consequence
@@ -52,6 +67,7 @@
     investigation, if it were real, would involve a written notice and a
     physical summons, not a same-day phone threat.
   source: "I4C advisory on digital arrest scams"
+  source_url: "https://i4c.mha.gov.in/press-release.aspx"
   counter_action: "Do not respond to the threat. Verify independently with the agency named, using a number you find yourself, not one given to you on the call."
 
 - id: verification_theater
@@ -63,6 +79,7 @@
     verification process anywhere involves you sending money to prove your
     money is clean.
   source: "RBI public awareness communications on frauds; I4C advisory on digital arrest scams"
+  source_url: "https://www.rbi.org.in/commonperson/English/Scripts/SecureYourFinances.aspx"
   counter_action: "Do not transfer anything to 'verify' funds. No real process ever asks you to pay to prove you're innocent."
 
 - id: channel_switch
@@ -73,6 +90,7 @@
     remote-desktop apps like AnyDesk or TeamViewer, and do not conduct
     official business over WhatsApp or Telegram calls.
   source: "1930 National Cyber Crime Helpline public guidance"
+  source_url: "https://cybercrime.gov.in/Webform/Crime_AwarenessDetail.aspx"
   counter_action: "Never install an app someone asks you to install during an unsolicited call. Hang up and contact the institution directly."
 
 - id: payment_irreversibility
@@ -83,6 +101,7 @@
     money — never to receive it. If approving something requires your UPI
     PIN, money is leaving your account, not arriving.
   source: "RBI and NPCI public awareness guidance on UPI fraud"
+  source_url: "https://rbikehtahai.rbi.org.in/"
   counter_action: "Never enter your UPI PIN to 'receive' a payment. If a PIN is required, stop — you are about to pay, not get paid."
 
 - id: trust_transfer
@@ -93,6 +112,7 @@
     phone" is not proof of identity. Anyone can create a profile using a
     stolen photo and name.
   source: "1930 National Cyber Crime Helpline public guidance"
+  source_url: "https://cybercrime.gov.in/"
   counter_action: "Call the person back on the number you already have saved for them, not the new number they texted you from."
 
 - id: reciprocity_hook
@@ -102,6 +122,7 @@
     Legitimate refunds, prizes, or cashback are never released only after
     you first pay a "processing fee" or share your card/PIN details.
   source: "I4C advisory on lottery and prize-based frauds"
+  source_url: "https://cybercrime.gov.in/Webform/Crime_AwarenessDetail.aspx"
   counter_action: "Ignore it. A real refund from a bank or company never requires you to pay first to receive it."
 
 - id: fake_scarcity
@@ -112,6 +133,7 @@
     described on their official website or app — if you can't find it
     there, the urgency is manufactured.
   source: "I4C consumer fraud advisory"
+  source_url: "https://cybercrime.gov.in/Webform/Crime_AwarenessDetail.aspx"
   counter_action: "Check the offer independently on the official website or app before acting. If it's real, it'll still be there in ten minutes."
 
 - id: sunk_cost_pressure
@@ -122,4 +144,5 @@
     Every additional payment request is a new decision, independent of what
     was already sent.
   source: "1930 National Cyber Crime Helpline public guidance"
+  source_url: "https://cybercrime.gov.in/"
   counter_action: "Stop now. Money already sent is gone either way — sending more does not get it back."
