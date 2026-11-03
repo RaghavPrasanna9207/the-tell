@@ -94,61 +94,66 @@ their own real messages.
 
 ## Amendments
 
-### 2026-09-08 — H2 is withdrawn as uninterpretable (two instrument defects)
+### 2026-09-08: H2 is withdrawn as uninterpretable (two instrument defects)
 
 Found during a post-hoc audit of the collected data, after all 20 participants had
-run. **H2's result is withdrawn.** It is not a null finding; it is a measurement
-that could not have detected the thing it claimed to measure. Both defects are in
-the instrument this document specified, not in the data collection or the analysis
-code, so they are logged here rather than fixed silently.
+run. **H2's result is withdrawn.** The data can't count as a null finding either,
+because the measurement could not have detected the thing it claimed to measure.
+Both defects are in the instrument this document specified, with none in the data
+collection or the analysis code, so they are logged here instead of fixed silently.
 
-**Defect 1 — the two arms were not differentiated on the H2 stimuli.**
+#### Defect 1: the two arms were not differentiated on the H2 stimuli
+
 H2 is computed entirely from S5 (bank OTP) and S6 (delivery notification). The
 pipeline classified both as clean (`is_clean=True` in `stimuli_cache.json`), so
 `run_study.py` rendered control as `[No warning was flagged for this message.]`
 and treatment as `No manipulation techniques detected.` Those are the same screen
 in different words. The design section above assumed the treatment arm would show
-"the full named-technique explanation" on every stimulus; on the only two stimuli
+"the full named-technique explanation" on every stimulus. On the only two stimuli
 H2 uses, there was no explanation to show, because the system correctly found
 nothing.
 
 The one live mechanism that remains is carryover: treatment participants saw four
 named-technique explanations on S1-S4 before reaching S5-S6. That is a legitimate
-design, but it is a substantially weaker test than this document described, and it
-was never stated as the mechanism. It is not what the analysis plan was written
-against.
+design, but it is a substantially weaker test than this document described, it was
+never stated as the mechanism, and the analysis plan was not written against it.
 
-**Defect 2 — the outcome coding conflates "no action needed" with "distrust."**
+#### Defect 2: the outcome coding conflates "no action needed" with "distrust"
+
 The primary outcome codes ignore / verify_independently / call_someone as
 "resistant." On a *scam* stimulus that coding is sound. On a *legitimate*
-informational message it is not: `ignore` is the correct, ordinary response to a
-delivery notification or an OTP you did not request — there is nothing to comply
-with. In the collected data, of the responses counted as "distrustful" on the
-legitimate stimuli, 15 of 17 (control) and **16 of 16** (treatment) are literally
+informational message it is wrong: `ignore` is the correct, ordinary response to a
+delivery notification or an OTP you did not request, since there is nothing to
+comply with. In the collected data, of the responses counted as "distrustful" on
+the legitimate stimuli, 15 of 17 (control) and 16 of 16 (treatment) are literally
 `ignore`. The reported 0.85 / 0.80 "false-alarm rate" therefore measures "did you
-decline to act on an informational SMS," not over-distrust. An 85% distrust rate
-for a routine HDFC OTP is implausible on its face, which is the tell.
+decline to act on an informational SMS" and says nothing about over-distrust. An
+85% distrust rate for a routine HDFC OTP is implausible on its face, which is the
+tell.
 
-**What changes, and what does not.**
-- The H1 analysis is unaffected and stands as pre-registered. On scam stimuli the
+#### What changes, and what does not
+
+- The H1 analysis is unaffected and holds as pre-registered. On scam stimuli the
   resistant coding is valid and both arms were properly differentiated.
 - H2's numbers are no longer reported as a finding. `analyze_study.py` still
-  computes them — deleting them would hide the error — but prints them under an
+  computes them (deleting them would hide the error) but prints them under an
   explicit UNINTERPRETABLE header with both defects and the ignore-share
   diagnostic, so the number cannot travel without its caveat.
-- The sections above are **not** edited. This document's purpose is to record what
+- The sections above are left unedited. This document's purpose is to record what
   was committed to in advance, including where that commitment turned out to be
   flawed.
 
-**Corrected instrument (built, not run).** The measure H2 needed is a direct
-judgment of the message, not an inferred one: *"Do you think this message is
-genuine? (Y/N)"*, asked per stimulus alongside the existing action question. On a
-legitimate stimulus, answering "no" is a false alarm regardless of what action the
-participant would take, which separates the two things the current coding fuses.
-This has been added to `run_study.py`, the spreadsheet export/import, and
-`analyze_study.py`, and is reported for any future run. It is deliberately left
-unrun: re-running with new participants is out of scope, and back-filling the
-existing 20 participants is not possible without re-contacting them, which the
-data-handling section forbids by design (ids are random and unlinked to identity).
+#### Corrected instrument (built, not run)
+
+H2 needed a direct judgment of the message in place of an inferred one: *"Do you
+think this message is genuine? (Y/N)"*, asked per stimulus alongside the existing
+action question. On a legitimate stimulus, answering "no" is a false alarm
+regardless of what action the participant would take, which separates the two
+things the current coding fuses. This has been added to `run_study.py`, the
+spreadsheet export/import, and `analyze_study.py`, and is reported for any future
+run. It is deliberately left unrun. Re-running with new participants is out of
+scope, and back-filling the existing 20 participants is not possible without
+re-contacting them, which the data-handling section forbids by design (ids are
+random and unlinked to identity).
 
 No other section of this pre-registration is amended.

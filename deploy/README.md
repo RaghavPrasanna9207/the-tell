@@ -8,24 +8,29 @@ Free tier: Docker SDK, 2 vCPU / 16GB RAM, no credit card. Sleeps after 48h idle.
 
 ## One-time setup
 
-**1. Publish the student.** `backend/models/` is gitignored, so the image has
-nothing to load without this.
+### 1. Publish the student
+
+`backend/models/` is gitignored, so the image has nothing to load without this.
 
 ```bash
 huggingface-cli login
 python backend/eval/publish_student.py --repo <user>/the-tell-student-modernbert
 ```
 
-**2. Create the Space** at https://huggingface.co/new-space with **Docker** as
-the SDK (blank template), then in Settings → Variables and secrets:
+### 2. Create the Space
+
+Create it at https://huggingface.co/new-space with Docker as the SDK (blank
+template), then in Settings → Variables and secrets:
 
 | Name | Kind | Value |
 |---|---|---|
 | `STUDENT_HF_REPO` | Variable | `<user>/the-tell-student-modernbert` |
 
-**3. Push.** The Space repo needs `Dockerfile` at its root and a `README.md`
-carrying the front matter below. Build context is the repo root, so both
-`backend/` and `frontend/` must be present.
+### 3. Push
+
+The Space repo needs `Dockerfile` at its root and a `README.md` carrying the
+front matter below. Build context is the repo root, so both `backend/` and
+`frontend/` must be present.
 
 ```bash
 git remote add space https://huggingface.co/spaces/<user>/the-tell
@@ -53,14 +58,14 @@ pinned: false
 
 See `Dockerfile.space`. Three things in it are non-obvious:
 
-- **CPU torch is installed explicitly** from the PyTorch CPU index. A plain
-  `pip install torch` resolves to the CUDA build — ~2.5GB of GPU libraries that
-  cannot run here.
-- **The student is baked in at build time** via `snapshot_download`. The free
-  tier has no persistent volume, so a runtime download would repeat on every
-  cold start, and `/data` isn't available during build anyway.
-- **The container runs as uid 1000.** Every `COPY` uses `--chown=user`;
-  without it the app cannot read its own files.
+- CPU torch is installed explicitly from the PyTorch CPU index. A plain
+  `pip install torch` resolves to the CUDA build, which is ~2.5GB of GPU
+  libraries that cannot run here.
+- The student is baked in at build time via `snapshot_download`. The free tier
+  has no persistent volume, so a runtime download would repeat on every cold
+  start, and `/data` isn't available during build anyway.
+- The container runs as uid 1000. Every `COPY` uses `--chown=user`; without it
+  the app cannot read its own files.
 
 The frontend is built in a first stage with `VITE_API_BASE=""` and served by
 FastAPI from the same origin, so there is no CORS boundary. `app/main.py`
@@ -74,11 +79,11 @@ It is not done until all of these hold:
 
 1. The Space URL loads the UI with no console errors.
 2. Pasting a digital-arrest message returns technique cards with the
-   manipulated span highlighted and **clickable** source links.
-3. Pasting a benign message returns "No manipulation techniques detected" —
-   and never the word "safe".
-4. The gate is genuinely running: a clean message resolves without a teacher call.
+   manipulated span highlighted and clickable source links.
+3. Pasting a benign message returns "No manipulation techniques detected",
+   never the word "safe".
+4. The gate is running: a clean message resolves without a teacher call.
    Confirm in the Space logs via the `gate: clean, teacher skipped` line.
 5. Cold-start-from-sleep time is measured and written into the root README.
    The 20-30s warm-up figure recorded elsewhere was measured on an RTX 4060;
-   two shared vCPUs will be slower and the real number belongs in the docs.
+   two shared vCPUs will be slower, and the measured number belongs in the docs.
